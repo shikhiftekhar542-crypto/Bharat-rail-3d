@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="hi"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b1d33">
+<link rel="manifest" href="manifest.json"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png">
+<title>भारत रेल – Indian Railway 3D</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;touch-action:none}
+html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:system-ui,-apple-system,"Noto Sans Devanagari",sans-serif;color:#fff}
+body{display:flex;align-items:center;justify-content:center}
+#stage{position:relative;overflow:hidden;background:#0b1d33;width:100vw;height:56.25vw;max-height:100vh}
+#rot{position:fixed;top:6px;left:0;right:0;text-align:center;font-size:13px;color:#ffd23f;display:none;z-index:30}
+@media (orientation:portrait){#rot{display:block}}
+#c{position:absolute;inset:0;width:100%;height:100%;display:block}
+.hud{position:absolute;pointer-events:none;text-shadow:0 1px 3px #000}
+#info{left:calc(10px + env(safe-area-inset-left));top:8px}
+#stn{font-size:18px;font-weight:700;background:rgba(10,30,60,.65);padding:4px 12px;border-radius:8px;border-left:5px solid #f5b50a}
+#sub{font-size:12px;margin-top:4px;opacity:.95}
+#map{position:absolute;left:10px;top:64px;border:1px solid #6a7a90;border-radius:6px;pointer-events:none}
+#route{position:absolute;left:10px;top:166px;display:none;gap:8px}
+.rb{padding:7px 13px;border-radius:16px;background:rgba(15,30,55,.8);border:2px solid #fff;font-size:13px;font-weight:700}
+.rb.sel{background:#2e9e4a}
+#autoBtn.sel{background:rgba(46,158,74,.9)}
+#toast{left:50%;top:10px;transform:translateX(-50%);background:rgba(0,0,0,.72);padding:7px 16px;border-radius:20px;font-size:15px;opacity:0;transition:opacity .3s;text-align:center;max-width:55vw}
+#prompt{left:50%;bottom:92px;transform:translateX(-50%);background:rgba(245,181,10,.92);color:#111;padding:6px 14px;border-radius:16px;font-size:14px;font-weight:700;display:none;text-shadow:none}
+.b{position:absolute;width:54px;height:54px;border-radius:50%;background:rgba(15,30,55,.62);border:2px solid rgba(255,255,255,.5);color:#fff;font-size:22px;display:flex;align-items:center;justify-content:center;touch-action:none}
+.b:active,.b.on{background:rgba(245,181,10,.8);color:#111}
+#top{position:absolute;right:calc(8px + env(safe-area-inset-right));top:8px;display:flex;gap:8px}
+#top .b{position:static;width:42px;height:42px;font-size:18px}
+#joy{position:absolute;left:calc(26px + env(safe-area-inset-left));bottom:26px;width:130px;height:130px;border-radius:50%;background:rgba(15,30,55,.45);border:2px solid rgba(255,255,255,.4)}
+#knob{position:absolute;left:35px;top:35px;width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,.55)}
+#btnUse{right:calc(24px + env(safe-area-inset-right));bottom:30px;width:84px;height:84px;font-size:13px;font-weight:700;background:rgba(214,110,10,.8);text-align:center;line-height:1.15}
+#btnJump{right:calc(120px + env(safe-area-inset-right));bottom:30px}
+#btnHorn{right:calc(24px + env(safe-area-inset-right));bottom:128px}
+#drive{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);display:none;background:rgba(8,16,28,.82);border:2px solid #556;border-radius:14px;padding:8px 14px;gap:12px;align-items:center}
+#drive .b{position:static;width:50px;height:50px;font-size:16px}
+#spd{font-size:34px;font-weight:800;color:#7CFC8A;min-width:92px;text-align:center;line-height:1}
+#spd small{font-size:12px;color:#aaa;display:block}
+#thrbar{width:16px;height:64px;background:#222;border:1px solid #777;position:relative}
+#thrfill{position:absolute;left:0;right:0;bottom:0;background:#f5b50a}
+#dinfo{font-size:12px;line-height:1.5;min-width:150px}
+#sigdot{display:inline-block;width:12px;height:12px;border-radius:50%;background:#e22;vertical-align:middle}
+#start{position:absolute;inset:0;background:linear-gradient(#0b1d33,#1d4f9c);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;z-index:9;padding:20px}
+#start h1{margin:0 0 6px;font-size:30px}
+#start p{margin:4px 0;font-size:14px;max-width:560px;opacity:.9;line-height:1.5}
+#startBtn{margin-top:14px;font-size:20px;font-weight:700;padding:12px 34px;border-radius:30px;border:0;background:#f5b50a;color:#111}
+</style></head><body>
+<div id="rot">📱 फोन को आड़ा (landscape) करें — पूरा 16:9 स्क्रीन मिलेगा</div>
+<div id="stage">
+<canvas id="c"></canvas>
+<div class="hud" id="info"><div id="stn">भारत रेल</div><div id="sub"></div></div>
+<div class="hud" id="toast"></div>
+<canvas id="map" width="250" height="96"></canvas>
+<div id="route"><div class="rb" id="rt1">पटरी 1</div><div class="rb" id="rt3">पटरी 3</div></div>
+<div class="hud" id="prompt"></div>
+<div id="top">
+ <div class="b" id="btnLoco">🚂</div><div class="b" id="btnMap">🗺</div><div class="b" id="btnCam">👁</div><div class="b" id="btnTime">☀</div><div class="b" id="btnSnd">🔊</div><div class="b" id="btnFs">⛶</div>
+</div>
+<div id="joy"><div id="knob"></div></div>
+<div class="b" id="btnJump">⤒</div>
+<div class="b" id="btnHorn">📯</div>
+<div class="b" id="btnUse">उपयोग</div>
+<div id="drive">
+ <div id="spd">0<small>km/h</small></div>
+ <div id="thrbar"><div id="thrfill"></div></div>
+ <div class="b" id="thrUp">▲</div><div class="b" id="thrDn">▼</div>
+ <div class="b" id="brk" style="background:rgba(190,30,30,.7)">BRK</div>
+ <div class="b" id="autoBtn" style="font-size:12px;font-weight:700">AUTO</div>
+ <div id="dinfo"></div>
+ <div class="b" id="exitCab">🚪</div>
+</div>
+<div id="start">
+ <h1>🚆 भारत रेल 3D</h1>
+ <p id="startMsg">मध्य प्रदेश के स्टेशन • असली जैसे प्लेटफॉर्म, ट्रेनें, यात्री, पुल, सीढ़ी और लिफ्ट<br>
+ बाएँ जॉयस्टिक से चलें, दाएँ तरफ स्क्रीन खींचकर घूमें। ट्रेन के पास <b>उपयोग</b> दबाकर इंजन में बैठें और खुद चलाएँ!</p>
+ <button id="startBtn">▶ खेल शुरू करें</button>
+</div>
+</div>
+<script>
+(function(){
+var U=['https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js','https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js','three.min.js'],s=null;
+try{s=localStorage.getItem('three128');}catch(e){}
+for(var i=0;i<U.length&&!s;i++){try{var x=new XMLHttpRequest();x.open('GET',U[i],false);x.send();if(x.status==200||x.status==0&&x.responseText){if(x.responseText.indexOf('WebGLRenderer')>0){s=x.responseText;try{localStorage.setItem('three128',s);}catch(e){}}}}catch(e){}}
+if(s){var t=document.createElement('script');t.textContent=s;document.head.appendChild(t);}
+})();
+</script>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const rnd=(a,b)=>a+Math.random()*(b-a), pick=a=>a[Math.floor(Math.random()*a.length)];
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), lerp=(a,b,t)=>a+(b-a)*t;
+if(!window.THREE){
+  $('startMsg').innerHTML='⚠️ 3D इंजन लोड नहीं हुआ।<br>पहली बार इंटरनेट चालू करके फाइल खोलें (या three.min.js इसी फोल्डर में रखें)।';
+  $('startBtn').style.display='none'; throw new Error('THREE missing');
+}
+/* ---------- मध्य प्रदेश के स्टेशन ---------- */
+const MP=[['भोपाल जं.','BHOPAL JN'],['रानी कमलापति','RANI KAMLAPATI'],['इटारसी जं.','ITARSI JN'],['पिपरिया','PIPARIA'],['नर्मदापुरम','NARMADAPURAM'],
+['सीहोर','SEHORE'],['विदिशा','VIDISHA'],['बीना जं.','BINA JN'],['सागर','SAGAR'],['दमोह','DAMOH'],['कटनी जं.','KATNI JN'],['जबलपुर','JABALPUR'],
+['मैहर','MAIHAR'],['सतना','SATNA'],['रीवा','REWA'],['नरसिंहपुर','NARSINGHPUR'],['गुना','GUNA'],['अशोकनगर','ASHOKNAGAR'],['शिवपुरी','SHIVPURI'],
+['ग्वालियर जं.','GWALIOR JN'],['मुरैना','MORENA'],['दतिया','DATIA'],['शाजापुर','SHAJAPUR'],['देवास जं.','DEWAS JN'],['उज्जैन जं.','UJJAIN JN'],
+['इंदौर जं.','INDORE JN'],['रतलाम जं.','RATLAM JN'],['खंडवा जं.','KHANDWA JN'],['बुरहानपुर','BURHANPUR'],['हरदा','HARDA']];
+let stIdx=0, nextIdx=1;
+
+/* ---------- रेंडरर, सीन, कैमरा ---------- */
+const renderer=new THREE.WebGLRenderer({canvas:$('c'),antialias:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.6));
+renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.3;
+renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFShadowMap;
+const scene=new THREE.Scene();
+scene.fog=new THREE.Fog(0xc9dcec,70,650);
+const camera=new THREE.PerspectiveCamera(65,1,0.1,1500);
+const stage=$('stage');
+function resize(){const W=innerWidth,H=innerHeight;let w=W,h=W*9/16;if(h>H){h=H;w=H*16/9;}
+  stage.style.width=w+'px';stage.style.height=h+'px';stage.style.maxHeight='none';
+  renderer.setSize(Math.round(w),Math.round(h),false);camera.aspect=16/9;camera.updateProjectionMatrix();}
+addEventListener('resize',resize);resize();
+const hemi=new THREE.HemisphereLight(0xdbeaff,0x6d5b45,0.85);scene.add(hemi);
+const sun=new THREE.DirectionalLight(0xfff1d6,1.0);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
+{const s=sun.shadow.camera;s.left=-48;s.right=48;s.top=48;s.bottom=-48;s.near=1;s.far=220;sun.shadow.bias=-0.0007;}
+scene.add(sun,sun.target);
+
+function gradTex(stops){const c=document.createElement('canvas');c.width=4;c.height=256;const g=c.getContext('2d');
+  const gr=g.createLinearGradient(0,0,0,256);stops.forEach(s=>gr.addColorStop(s[0],s[1]));g.fillStyle=gr;g.fillRect(0,0,4,256);
+  const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;return t;}
+const SKY={day:gradTex([[0,'#3b78cc'],[0.5,'#cfe6f6'],[1,'#cfe6f6']]),night:gradTex([[0,'#03060d'],[0.5,'#26385c'],[1,'#26385c']])};
+const sky=new THREE.Mesh(new THREE.SphereGeometry(1200,24,16),new THREE.MeshBasicMaterial({map:SKY.day,side:THREE.BackSide,fog:false,depthWrite:false}));
+scene.add(sky);
+
+/* ---------- टेक्सचर / मटेरियल ---------- */
+function tex(w,h,draw,rx=1,ry=1){const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');draw(g,w,h);
+  const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rx,ry);t.encoding=THREE.sRGBEncoding;t.anisotropy=4;return t;}
+function speckle(g,w,h,n,cols,sz){for(let i=0;i<n;i++){g.fillStyle=pick(cols);g.fillRect(Math.random()*w,Math.random()*h,sz,sz);}}
+const std=(c,o={})=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.85,metalness:.05},o));
+const tmat=(t,o={})=>std(0xffffff,Object.assign({map:t},o));
+const grassTex=()=>tex(256,256,(g,w,h)=>{g.fillStyle='#5f7f3c';g.fillRect(0,0,w,h);speckle(g,w,h,2200,['#6f9444','#4f6d31','#7da24c','#58773a'],3);},300,300);
+const gravelTex=(rx,ry)=>tex(256,256,(g,w,h)=>{g.fillStyle='#6d6a63';g.fillRect(0,0,w,h);speckle(g,w,h,2600,['#8b877e','#57544e','#9d998f','#44413c'],3);},rx,ry);
+const tileTex=(rx,ry)=>tex(256,256,(g,w,h)=>{g.fillStyle='#b9b6ad';g.fillRect(0,0,w,h);speckle(g,w,h,900,['#c8c5bc','#aaa79e'],3);g.strokeStyle='#8e8b83';g.lineWidth=2;for(let i=0;i<=256;i+=64){g.beginPath();g.moveTo(i,0);g.lineTo(i,256);g.stroke();g.beginPath();g.moveTo(0,i);g.lineTo(256,i);g.stroke();}},rx,ry);
+const brickTex=(rx,ry)=>tex(256,256,(g,w,h)=>{g.fillStyle='#8f3f2c';g.fillRect(0,0,w,h);for(let y=0;y<256;y+=16)for(let x=((y/16)%2)*16;x<256+16;x+=32){g.fillStyle=pick(['#a14a33','#8a3a28','#9a4630','#7f3524']);g.fillRect(x+1,y+1,30,14);}},rx,ry);
+const roadTex=(rx,ry)=>tex(256,256,(g,w,h)=>{g.fillStyle='#3a3b3e';g.fillRect(0,0,w,h);speckle(g,w,h,1500,['#4a4b4f','#2e2f32'],2);},rx,ry);
+const M={
+  conc:std(0xb8b5ad),dark:std(0x2b2d31),metal:std(0x6c7077,{metalness:.5,roughness:.5}),rail:std(0x8a8d93,{metalness:.7,roughness:.4}),
+  wood:std(0x4a3a2c),yellow:std(0xf2c200),white:std(0xeeeeee),red:std(0xb3221b),blue:std(0x1d4f9c),green:std(0x2f7d3b),roof:std(0x7d8a96,{metalness:.3}),
+  glass:std(0x9fd0e6,{transparent:true,opacity:.35,roughness:.1}),seat:std(0x23468a),floor:std(0x6e5a48),
+  lamp:new THREE.MeshBasicMaterial({color:0xfff4c0}),
+  sigR:new THREE.MeshBasicMaterial({color:0xff2a2a}),sigG:new THREE.MeshBasicMaterial({color:0x22ff66}),sigOff:new THREE.MeshBasicMaterial({color:0x2a2a2a})
+};
+const lampMats=[M.lamp];
+
+/* ---------- हेल्पर ---------- */
+const WALLS=[];
+function addWall(x0,x1,z0,z1,top){WALLS.push({x0,x1,z0,z1,top});}
+function box(w,h,d,mat,x,y,z,parent,o={}){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);
+  m.castShadow=o.cast!==false;m.receiveShadow=o.recv!==false;(parent||scene).add(m);
+  if(o.solid)addWall(x-w/2,x+w/2,z-d/2,z+d/2,y+h/2);
+  return m;}
+function signMesh(wm,hm,lines,bg,double){
+  const W=512,H=Math.round(512*hm/wm);
+  const t=tex(W,H,(g)=>{g.fillStyle=bg;g.fillRect(0,0,W,H);g.textAlign='center';g.textBaseline='middle';
+    const n=lines.length;lines.forEach((l,i)=>{g.fillStyle=l.c||'#fff';g.font='bold '+l.s+'px sans-serif';g.fillText(l.t,W/2,H*(i+.5)/n);});});
+  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(wm,hm),new THREE.MeshBasicMaterial({map:t,side:double?THREE.DoubleSide:THREE.FrontSide}));
+  return mesh;}
+const nameBoards=[];
+function nameBoard(wm,hm,parent,x,y,z,ry){
+  const W=1024,H=Math.round(1024*hm/wm);const c=document.createElement('canvas');c.width=W;c.height=H;
+  const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(wm,hm),new THREE.MeshBasicMaterial({map:t,side:THREE.DoubleSide}));
+  m.position.set(x,y,z);m.rotation.y=ry||0;parent.add(m);nameBoards.push({c,t,W,H});return m;}
+function redrawNames(){
+  const [hi,en]=MP[stIdx];
+  nameBoards.forEach(b=>{const g=b.c.getContext('2d');g.fillStyle='#f4c20d';g.fillRect(0,0,b.W,b.H);g.fillStyle='#111';g.fillRect(6,6,b.W-12,b.H-12);
+    g.fillStyle='#f4c20d';g.fillRect(14,14,b.W-28,b.H-28);g.fillStyle='#111';g.textAlign='center';g.textBaseline='middle';
+    g.font='bold '+Math.round(b.H*.42)+'px sans-serif';g.fillText(hi,b.W/2,b.H*.32);g.font='bold '+Math.round(b.H*.3)+'px sans-serif';g.fillText(en,b.W/2,b.H*.72);b.t.needsUpdate=true;});
+  $('stn').textContent='🚉 '+hi+' · '+en;}
+
+/* ---------- दिन / रात ---------- */
+let night=false;
+function setNight(n){
+  night=n;sky.material.map=n?SKY.night:SKY.day;sky.material.needsUpdate=true;
+  scene.fog.color.set(n?0x1a2540:0xc9dcec);hemi.intensity=n?.42:.85;hemi.color.set(n?0x6f86c0:0xdbeaff);
+  sun.intensity=n?.18:1.0;sun.color.set(n?0x9fb4ff:0xfff1d6);
+  M.lamp.color.set(n?0xfff0a8:0x9a9686);$('btnTime').textContent=n?'🌙':'☀';}
+
+/* ================= स्टेशन का नक्शा ================= */
+const PH=0.9, FLOORY=1.1, BY=6.5;                 // प्लेटफॉर्म ऊँचाई, डिब्बे का फर्श, पुल की ऊँचाई
+const PLAT=[{cx:-14,x0:-17,x1:-11},{cx:-3,x0:-7,x1:1},{cx:8,x0:5,x1:11}];
+const TRK=[-9,3,13];                              // तीनों पटरियों का x
+const station=new THREE.Group();scene.add(station);   // स्टेशन के सारे ऑब्जेक्ट
+const trackGroups=[];
+
+/* ज़मीन */
+const grassBig=new THREE.Mesh(new THREE.PlaneGeometry(3000,3000),tmat(grassTex(),{roughness:1}));
+grassBig.rotation.x=-Math.PI/2;grassBig.position.set(0,-0.02,0);grassBig.receiveShadow=true;scene.add(grassBig);
+{const m=new THREE.Mesh(new THREE.PlaneGeometry(32,1000),tmat(gravelTex(8,250)));m.rotation.x=-Math.PI/2;m.position.set(-1.5,0.02,0);m.receiveShadow=true;station.add(m);}
+
+/* पटरियाँ: गिट्टी, स्लीपर, रेल, बिजली के तार */
+function buildTrack(x,withMasts){
+  const g=new THREE.Group();scene.add(g);
+  box(4.6,0.24,1000,tmat(gravelTex(2,250)),x,0.12,0,g,{cast:false});
+  box(.12,.2,1000,M.rail,x-0.7175,0.34,0,g,{cast:false});box(.12,.2,1000,M.rail,x+0.7175,0.34,0,g,{cast:false});
+  const N=1540,sl=new THREE.InstancedMesh(new THREE.BoxGeometry(2.6,.14,.3),M.wood,N);const d=new THREE.Object3D();
+  for(let i=0;i<N;i++){d.position.set(x,0.27,-500+i*0.65);d.updateMatrix();sl.setMatrixAt(i,d.matrix);}
+  sl.receiveShadow=true;g.add(sl);
+  box(.05,.05,1000,M.dark,x,5.4,0,g,{cast:false});          // OHE तार
+  if(withMasts){for(let z=-487.5;z<500;z+=65){box(.3,6.2,.3,M.metal,x+2.6,3.1,z,g,{cast:false});box(2.6,.15,.15,M.metal,x+1.3,5.6,z,g,{cast:false});}}
+  trackGroups.push(g);return g;}
+buildTrack(TRK[0]);buildTrack(TRK[1]);buildTrack(TRK[2],true);
+/* स्टेशन के पोर्टल गैन्ट्री (तार टाँगने के लिए) */
+for(let z=-292.5;z<=300;z+=65){box(.4,6.6,.4,M.metal,-18.2,3.3,z,station,{cast:false});box(.4,6.6,.4,M.metal,15.8,3.3,z,station,{cast:false});box(34,.3,.3,M.metal,-1.2,6.4,z,station,{cast:false});}
+
+/* प्लेटफॉर्म */
+PLAT.forEach((p,i)=>{
+  const w=p.x1-p.x0;
+  box(w,PH,200,M.conc,p.cx,PH/2,0,station);
+  const top=new THREE.Mesh(new THREE.PlaneGeometry(w,200),tmat(tileTex(w/3,66),{roughness:.9}));top.rotation.x=-Math.PI/2;top.position.set(p.cx,PH+0.006,0);top.receiveShadow=true;station.add(top);
+  const edges=[];if(i===0)edges.push(p.x1-0.4);else if(i===1)edges.push(p.x0+0.4,p.x1-0.4);else edges.push(p.x0+0.4,p.x1-0.4);
+  edges.forEach(ex=>box(.4,.02,200,M.yellow,ex,PH+0.012,0,station,{cast:false}));
+  const ang=Math.atan2(PH,8),len=Math.hypot(8,PH);
+  [1,-1].forEach(s=>{const r=box(w,.2,len,M.conc,p.cx,PH/2,s*104,station);r.rotation.x=s*ang;});
+  /* प्लेटफॉर्म नंबर बोर्ड */
+  [-62,0,62].forEach(z=>{const sg=signMesh(3.2,1.1,[{t:'प्लेटफॉर्म '+(i+1),s:92,c:'#fff'},{t:'PLATFORM '+(i+1),s:54,c:'#ffd23f'}],'#0d3b73',true);
+    sg.position.set(p.cx,4.1,z);station.add(sg);box(.06,.9,.06,M.dark,p.cx,4.95,z,station,{cast:false});});
+});
+
+/* ================= छत, पुल, सीढ़ी, लिफ्ट ================= */
+const lampBoxes=[];
+PLAT.forEach((p,i)=>{
+  const w=p.x1-p.x0+1;
+  [[-96,-54],[-34,96]].forEach(([a,b])=>{
+    box(w,.25,b-a,M.roof,p.cx,5.3,(a+b)/2,station);
+    for(let z=a+2;z<=b-1;z+=12){
+      box(.3,4.4,.3,M.metal,p.cx,PH+2.2,z,station,{solid:true});
+      box(.35,.1,.7,M.lamp,p.cx,5.12,z+6,station,{cast:false});
+    }
+  });
+  /* बेंच, कूड़ेदान */
+  [-80,-22,18,70].forEach(z=>{
+    box(2.4,.12,.6,M.wood,p.cx-1.8,PH+.5,z,station,{solid:true});box(2.4,.7,.1,M.wood,p.cx-1.8,PH+.85,z-.3,station,{cast:false});
+    box(.1,.5,.5,M.dark,p.cx-2.8,PH+.25,z,station,{cast:false});box(.1,.5,.5,M.dark,p.cx-.8,PH+.25,z,station,{cast:false});
+  });
+  box(.5,.8,.5,M.green,p.cx+1.5,PH+.4,-70,station,{solid:true});
+  /* स्टेशन नाम बोर्ड */
+  [-75,75].forEach(z=>nameBoard(4.6,1.15,station,p.cx,4.2,z,0));
+});
+/* चाय स्टॉल और पुस्तक स्टॉल */
+function stall(x,z,txt,col){
+  box(2.6,2.6,1.5,std(col),x,PH+1.3,z,station,{solid:true});box(3.2,.2,2.1,M.red,x,PH+2.7,z,station);
+  const s=signMesh(2.6,.6,[{t:txt,s:70,c:'#111'}],'#ffd23f',true);s.position.set(x,PH+2.2,z-.78);station.add(s);
+  const s2=s.clone();s2.position.z=z+.78;station.add(s2);
+  box(2.2,.9,.12,M.dark,x,PH+1.0,z-.8,station,{cast:false});}
+stall(-5.0,40,'चाय • नाश्ता',0x2e6b8a);stall(6.4,-72,'पुस्तक भंडार',0x7a4a2a);stall(-15.4,60,'पानी • ठंडा',0x3b7a4a);
+
+/* फुट-ओवर-ब्रिज */
+const FOB={x0:-17.6,x1:11.6,z0:-41.5,z1:-38.5};
+{
+  const len=FOB.x1-FOB.x0,cx=(FOB.x0+FOB.x1)/2,zc=(FOB.z0+FOB.z1)/2;
+  box(len,.3,3,M.conc,cx,BY-.15,zc,station);
+  box(len,.2,3.8,M.roof,cx,9.5,zc,station);
+  [-16.6,-11.6,-6.4,.4,5.6,10.4].forEach(x=>box(.5,9.4,.5,M.conc,x,4.7,zc,station,{solid:true}));
+  const gapsN=PLAT.map(p=>[p.cx-1.2,p.cx+1.2]),gapsS=PLAT.map(p=>[p.cx-1.1,p.cx+1.1]);
+  function rail(z,gaps){let a=FOB.x0;gaps.concat([[FOB.x1,FOB.x1]]).forEach(([g0,g1])=>{if(g0>a){box(g0-a,1.1,.08,M.metal,(a+g0)/2,BY+.55,z,station,{cast:false});}a=g1;});}
+  rail(FOB.z0,gapsN);rail(FOB.z1,gapsS);
+  box(.08,1.1,3,M.metal,FOB.x0,BY+.55,zc,station,{cast:false});box(.08,1.1,3,M.metal,FOB.x1,BY+.55,zc,station,{cast:false});
+  const sg=signMesh(6,1,[{t:'पैदल पार पथ  •  FOOT OVER BRIDGE',s:44,c:'#fff'}],'#0d3b73',true);sg.position.set(cx,BY+2.6,zc);station.add(sg);
+}
+/* सीढ़ी */
+const STAIR={z0:-50,z1:-41.5};
+PLAT.forEach(p=>{
+  const L=STAIR.z1-STAIR.z0,n=15,rise=(BY-PH)/n,ang=Math.atan2(BY-PH,L),len=Math.hypot(L,BY-PH),zc=(STAIR.z0+STAIR.z1)/2;
+  for(let i=0;i<n;i++){const z=STAIR.z0+(i+.5)*L/n,y=PH+(i+1)*rise;box(2.4,.12,L/n+.02,M.conc,p.cx,y-.06,z,station,{cast:false});}
+  [-1.2,1.2].forEach(s=>{const m=box(.12,.4,len,M.metal,p.cx+s,(PH+BY)/2-.15,zc,station,{cast:false});m.rotation.x=-ang;
+    const h=box(.06,.06,len,M.metal,p.cx+s,(PH+BY)/2+.9,zc,station,{cast:false});h.rotation.x=-ang;});
+  const sg=signMesh(2.4,.5,[{t:'⬆ पुल / सीढ़ी',s:60}],'#0d3b73',true);sg.position.set(p.cx,3.0,STAIR.z0-1.2);station.add(sg);
+});
+/* लिफ्ट */
+const lifts=[];
+PLAT.forEach(p=>{
+  const zc=-37.4,top=BY+2.5;
+  [[-1.1,-1.1],[1.1,-1.1],[-1.1,1.1],[1.1,1.1]].forEach(([dx,dz])=>box(.12,top-PH,.12,M.metal,p.cx+dx,(top+PH)/2,zc+dz,station,{cast:false}));
+  box(2.5,.12,2.5,M.metal,p.cx,top,zc,station,{cast:false});
+  const cab=new THREE.Group();station.add(cab);
+  box(2.1,.12,2.1,M.metal,0,0,0,cab);box(.05,2.3,2.1,M.glass,-1.04,1.2,0,cab,{cast:false});box(.05,2.3,2.1,M.glass,1.04,1.2,0,cab,{cast:false});
+  box(2.1,.1,2.1,M.metal,0,2.4,0,cab);box(2.1,.08,.08,M.lamp,0,2.32,0,cab,{cast:false});
+  cab.position.set(p.cx,PH,zc);
+  const sg=signMesh(1.6,.45,[{t:'🛗 लिफ्ट',s:70}],'#0d3b73',true);sg.position.set(p.cx,PH+3.2,zc+1.3);station.add(sg);
+  lifts.push({cx:p.cx,z:zc,y:PH,target:PH,cab});
+});
+
+/* ================= स्टेशन भवन ================= */
+const BLD={x0:-42,x1:-17.5,z0:-35,z1:35};
+{
+  const W=BLD.x1-BLD.x0,D=BLD.z1-BLD.z0,top=PH+5;
+  box(W+.5,PH,D,M.conc,(BLD.x0+BLD.x1)/2+.25,PH/2,0,station);
+  const fl=new THREE.Mesh(new THREE.PlaneGeometry(W+.5,D),tmat(tileTex(W/3,D/3)));fl.rotation.x=-Math.PI/2;fl.position.set((BLD.x0+BLD.x1)/2+.25,PH+.006,0);fl.receiveShadow=true;station.add(fl);
+  const wall=(x0,x1,z0,z1,y0,y1,solid)=>{const w=x1-x0,d=z1-z0,h=y1-y0;const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),tmat(brickTex(Math.max(w,d)/4,h/4)));
+    m.position.set((x0+x1)/2,(y0+y1)/2,(z0+z1)/2);m.castShadow=m.receiveShadow=true;station.add(m);if(solid)addWall(x0,x1,z0,z1,y1);};
+  wall(BLD.x0,BLD.x1,BLD.z0-.4,BLD.z0,PH,top,true);wall(BLD.x0,BLD.x1,BLD.z1,BLD.z1+.4,PH,top,true);
+  wall(BLD.x0-.4,BLD.x0,BLD.z0-.4,-5,PH,top,true);wall(BLD.x0-.4,BLD.x0,5,BLD.z1+.4,PH,top,true);
+  wall(BLD.x1-.4,BLD.x1,BLD.z0,-6,PH,top,true);wall(BLD.x1-.4,BLD.x1,6,BLD.z1,PH,top,true);
+  wall(BLD.x0-.4,BLD.x0,-5,5,PH+3.6,top,false);wall(BLD.x1-.4,BLD.x1,-6,6,PH+3.6,top,false);
+  box(W+1.2,.5,D+1.2,M.conc,(BLD.x0+BLD.x1)/2,top+.25,0,station);
+  nameBoard(9,1.3,station,BLD.x0-.5,PH+4.3,0,-Math.PI/2);nameBoard(9,1.3,station,BLD.x1+.05,PH+4.3,0,Math.PI/2);
+  const rs=signMesh(8,1.2,[{t:'रेलवे स्टेशन  •  RAILWAY STATION',s:46,c:'#fff'}],'#0d3b73');rs.position.set(BLD.x0-.5,top+1.1,0);rs.rotation.y=-Math.PI/2;station.add(rs);
+  box(.3,1.8,10,M.conc,BLD.x0-.5,top+1.0,0,station,{cast:false});
+  /* टिकट खिड़कियाँ */
+  [-38,-33,-28,-23].forEach((x,i)=>{
+    box(3.4,1.1,1,std(0x6b4a2b),x,PH+.55,-33.4,station,{solid:true});
+    box(3.4,.1,1.1,M.dark,x,PH+1.15,-33.4,station,{cast:false});
+    const s=signMesh(2.8,.6,[{t:'टिकट खिड़की '+(i+1),s:56},{t:'TICKET '+(i+1),s:36,c:'#ffd23f'}],'#0d3b73');s.position.set(x,PH+3.2,BLD.z0+.05);station.add(s);
+    box(2.2,1.3,.08,M.glass,x,PH+1.8,BLD.z0+.06,station,{cast:false});
+  });
+  /* स्तंभ, बेंच, पूछताछ */
+  [[-36,-14],[-27,-14],[-36,14],[-27,14]].forEach(([x,z])=>box(.8,5,.8,M.conc,x,PH+2.5,z,station,{solid:true}));
+  [-36,-30,-24].forEach(x=>[8,20,29].forEach(z=>{box(2.6,.45,.7,M.wood,x,PH+.5,z,station,{solid:true});box(2.6,.7,.1,M.wood,x,PH+.9,z+.35,station,{cast:false});}));
+  box(4,1.1,1.2,std(0x2e6b8a),-22,PH+.55,24,station,{solid:true});
+  const iq=signMesh(2.6,.6,[{t:'पूछताछ  ENQUIRY',s:52}],'#0d3b73',true);iq.position.set(-22,PH+2.3,24);station.add(iq);
+  [-38,-28].forEach(x=>{const lm=box(.5,.1,1.4,M.lamp,x,PH+4.9,0,station,{cast:false});});
+  const dc=signMesh(1.4,.5,[{t:'🕘 घड़ी',s:60}],'#222');
+}
+const TICKET_WIN=[-38,-33,-28,-23].map(x=>({x,z:-31.4}));
+/* सामने का मैदान, सड़क, ऑटो */
+{
+  const rd=new THREE.Mesh(new THREE.PlaneGeometry(40,170),tmat(roadTex(6,34)));rd.rotation.x=-Math.PI/2;rd.position.set(-63,0.03,0);rd.receiveShadow=true;station.add(rd);
+  function auto(x,z,ry){const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=ry;station.add(g);
+    box(1.3,1.3,1.8,std(0xf2c200),0,.95,-.4,g);box(1.4,.12,2.0,M.dark,0,1.65,-.4,g);box(1.3,.9,.2,M.green,0,.7,-1.4,g,{cast:false});
+    box(.5,.5,.5,M.dark,0,.3,.9,g);addWall(x-.8,x+.8,z-1.3,z+1.3,2);}
+  auto(-50,-8,0.3);auto(-52,6,-0.4);auto(-56,18,1.2);auto(-49,-20,2.0);
+  const bus=(x,z)=>{box(2.6,2.8,10,std(0xc43a2a),x,1.8,z,station,{solid:true});box(2.62,.9,9.6,M.glass,x,2.2,z,station,{cast:false});};
+  bus(-70,-30);bus(-70,32);
+}
+/* सिग्नल */
+function makeSignal(x,z,facingPlusZ){
+  const g=new THREE.Group();g.position.set(x,0,z);station.add(g);
+  box(.2,5.2,.2,M.dark,0,2.6,0,g,{cast:false});box(.7,1.7,.3,M.dark,0,5.0,0,g,{cast:false});
+  const s=facingPlusZ?1:-1;
+  const r=new THREE.Mesh(new THREE.SphereGeometry(.22,10,8),new THREE.MeshBasicMaterial({color:0xff2a2a}));r.position.set(0,5.4,s*.2);g.add(r);
+  const gr=new THREE.Mesh(new THREE.SphereGeometry(.22,10,8),new THREE.MeshBasicMaterial({color:0x22ff66}));gr.position.set(0,4.7,s*.2);g.add(gr);
+  const o={z,x,red:true,set(red){this.red=red;r.material.color.set(red?0xff2a2a:0x2a0a0a);gr.material.color.set(red?0x0a2a12:0x22ff66);}};o.set(true);return o;}
+const SIG=TRK.map((tx,k)=>{const dir=(k===1)?-1:1,sx=tx+(dir>0?-2.7:2.7);
+  return {dir,home:makeSignal(sx,dir*-125,dir>0),start:makeSignal(sx,dir*112,dir>0)};});
+/* पेड़ */
+const trunkGeo=new THREE.CylinderGeometry(.18,.28,2.6,6),crownGeo=new THREE.SphereGeometry(1.9,8,6);
+const trunkMat=std(0x5a4128),crownMats=[std(0x3f7a35),std(0x4d8c3b),std(0x2f6b2f)];
+function tree(parent,x,z,s){const g=new THREE.Group();const t=new THREE.Mesh(trunkGeo,trunkMat);t.position.y=1.3;const c=new THREE.Mesh(crownGeo,pick(crownMats));c.position.y=3.6;c.scale.set(1,.85,1);
+  t.castShadow=c.castShadow=true;g.add(t,c);g.position.set(x,0,z);g.scale.setScalar(s||1);parent.add(g);return g;}
+for(let i=0;i<36;i++){const x=rnd(-140,-84),z=rnd(-200,200);tree(station,x,z,rnd(.9,1.6));}
+for(let i=0;i<34;i++){const x=rnd(24,110),z=rnd(-250,250);tree(station,x,z,rnd(.9,1.6));}
+for(let i=0;i<14;i++){const x=rnd(-17,13)>0?rnd(18,24):rnd(-24,-19),z=rnd(140,300)*(Math.random()<.5?-1:1);tree(station,x,z,rnd(.9,1.4));}
+/* यात्रा के दौरान गाँव-खेत का नज़ारा */
+const scenery=new THREE.Group();scenery.visible=false;scene.add(scenery);
+const SC=[];for(let i=0;i<40;i++){const side=i%2?1:-1,t=tree(scenery,0,0,rnd(.9,1.7));SC.push({o:t,ox:side*(9+(i*7)%22),i});}
+
+/* ================= आवाज़ ================= */
+let AC=null,soundOn=true,engOsc=null,engGain=null;
+function initAudio(){if(AC)return;try{AC=new (window.AudioContext||window.webkitAudioContext)();
+  engOsc=AC.createOscillator();engOsc.type='sawtooth';engOsc.frequency.value=46;const f=AC.createBiquadFilter();f.type='lowpass';f.frequency.value=180;
+  engGain=AC.createGain();engGain.gain.value=0;engOsc.connect(f);f.connect(engGain);engGain.connect(AC.destination);engOsc.start();}catch(e){AC=null;}}
+function tone(f,d,type,vol){if(!AC||!soundOn)return;const o=AC.createOscillator(),g=AC.createGain();o.type=type||'sine';o.frequency.value=f;g.gain.value=vol||.1;
+  o.connect(g);g.connect(AC.destination);o.start();g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+d);o.stop(AC.currentTime+d);}
+function horn(){tone(311,1.2,'sawtooth',.11);tone(415,1.2,'sawtooth',.09);}
+function chime(){tone(880,.5,'sine',.14);setTimeout(()=>tone(660,.7,'sine',.14),380);}
+function speak(t){if(!soundOn||!window.speechSynthesis)return;try{const u=new SpeechSynthesisUtterance(t);u.lang='hi-IN';u.rate=.95;speechSynthesis.speak(u);}catch(e){}}
+let toastT=0;function toast(t,ms){const e=$('toast');e.textContent=t;e.style.opacity=1;clearTimeout(toastT);toastT=setTimeout(()=>e.style.opacity=0,ms||2600);}
+
+/* ================= डिब्बे और इंजन ================= */
+const COACH={icf:{body:'#1d4f9c',skirt:'#10203a',stripe:'#e9eef5'},lhb:{body:'#8e1b24',skirt:'#2a0f12',stripe:'#e9c46a'},vb:{body:'#eef2f6',skirt:'#1b3a6b',stripe:'#e07a1f'}};
+const coachTexCache={};
+const wheelGeo=new THREE.CylinderGeometry(.45,.45,.14,12);
+const SEAT_X=[-1.22,-.72,.72,1.22],COACH_SLOTS=[];
+for(let r=0;r<9;r++)SEAT_X.forEach(lx=>COACH_SLOTS.push({lx,lz:-6.2+r*1.55}));
+function coachTex(kind,v){
+  const key=kind+(v%3);if(coachTexCache[key])return coachTexCache[key];
+  const W=1024,H=200,th=COACH[kind];
+  const t=tex(W,H,(g)=>{
+    g.fillStyle=th.body;g.fillRect(0,0,W,H);g.fillStyle=th.skirt;g.fillRect(0,H*.86,W,H*.14);
+    g.fillStyle=th.stripe;g.fillRect(0,H*.78,W,7);g.fillRect(0,H*.1,W,5);
+    for(let i=0;i<11;i++){const x=172+i*68;
+      g.fillStyle='#1a1f26';g.fillRect(x-31,42,62,88);
+      g.clearRect(x-27,46,54,80);                       /* असली खुली खिड़की (अंदर दिखता है) */
+      if(Math.random()<.3){g.fillStyle='#6a7fb0';g.fillRect(x-27,46,54,26);}   /* पर्दा */
+    }
+    g.fillStyle=kind==='vb'?'#1b3a6b':th.stripe;g.font='bold 22px sans-serif';g.textAlign='center';g.fillText('भारतीय रेल  INDIAN RAILWAYS',W/2,H*.72);
+  });
+  t.repeat.set(1,1);return coachTexCache[key]=t;}
+const coachRoofMat=std(0xb8bdc4,{metalness:.3}),coachDarkMat=std(0x1b1d21);
+function makeCoach(kind,v){
+  const g=new THREE.Group();
+  const mat=new THREE.MeshStandardMaterial({map:coachTex(kind,v),roughness:.55,metalness:.2,side:THREE.DoubleSide,alphaTest:.5});
+  const bodyMat=std(new THREE.Color(COACH[kind].body),{side:THREE.DoubleSide});
+  [1,-1].forEach(side=>{
+    [[-10,-8.7],[-7.3,7.3],[8.7,10]].forEach(([a,b])=>{
+      const geo=new THREE.PlaneGeometry(b-a,3.9),uv=geo.attributes.uv;
+      const u0=side>0?(10-b)/20:(a+10)/20,u1=side>0?(10-a)/20:(b+10)/20;
+      for(let i=0;i<uv.count;i++)uv.setX(i,uv.getX(i)<.5?u0:u1);
+      geo.rotateY(side>0?Math.PI/2:-Math.PI/2);
+      const m=new THREE.Mesh(geo,mat);m.position.set(side*1.6,2.55,(a+b)/2);m.castShadow=true;g.add(m);});
+    [-8,8].forEach(dz=>{box(.1,1.3,1.4,bodyMat,side*1.6,3.85,dz,g,{cast:false});box(.1,.5,1.4,bodyMat,side*1.6,.85,dz,g,{cast:false});});
+    [-10,10].forEach(ez=>{box(.7,3.9,.1,bodyMat,side*1.25,2.55,ez,g,{cast:false});});
+  });
+  [-10,10].forEach(ez=>box(1.8,1.3,.1,bodyMat,0,3.85,ez,g,{cast:false}));
+  box(3.2,.35,20,coachRoofMat,0,4.68,0,g);box(1.6,.3,2.6,M.metal,0,4.98,-4,g);box(1.6,.3,2.6,M.metal,0,4.98,4,g);
+  box(3.0,.12,19.8,M.floor,0,FLOORY-.06,0,g,{cast:false});
+  box(2.9,.55,19.4,coachDarkMat,0,.72,0,g);
+  [-6.5,6.5].forEach(z=>{box(2.5,.45,3.6,coachDarkMat,0,.48,z,g);[-.7175,.7175].forEach(x=>[-1,1].forEach(s=>{const w=new THREE.Mesh(wheelGeo,coachDarkMat);w.rotation.z=Math.PI/2;w.position.set(x,.45,z+s*1.1);g.add(w);}));});
+  [-.8,.8].forEach(x=>box(.08,.1,19,M.lamp,x,4.45,0,g,{cast:false}));
+  const n=COACH_SLOTS.length,sm=new THREE.InstancedMesh(new THREE.BoxGeometry(.46,.4,.55),M.seat,n),bm=new THREE.InstancedMesh(new THREE.BoxGeometry(.46,.85,.1),M.seat,n),d=new THREE.Object3D();
+  COACH_SLOTS.forEach((s,i)=>{d.position.set(s.lx,FLOORY+.3,s.lz);d.updateMatrix();sm.setMatrixAt(i,d.matrix);d.position.set(s.lx,FLOORY+.75,s.lz-.25);d.updateMatrix();bm.setMatrixAt(i,d.matrix);});
+  g.add(sm,bm);
+  return g;}
+
+/* ---- इंजन: खुलने वाला दरवाज़ा, अंदर केबिन, डैशबोर्ड ---- */
+function makeDash(){const c=document.createElement('canvas');c.width=512;c.height=128;const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;return {c,t,g:c.getContext('2d')};}
+function drawDash(d,sp,th,info,red){
+  const g=d.g;g.fillStyle='#08101c';g.fillRect(0,0,512,128);g.strokeStyle='#33465f';g.lineWidth=3;g.strokeRect(2,2,508,124);
+  g.fillStyle='#7CFC8A';g.font='bold 64px monospace';g.textAlign='left';g.fillText(String(Math.round(sp*3.6)).padStart(3,' '),12,78);
+  g.font='18px sans-serif';g.fillStyle='#9fb0c8';g.fillText('km/h',18,108);
+  g.strokeStyle='#556';g.lineWidth=2;g.strokeRect(190,16,28,96);g.fillStyle='#f5b50a';g.fillRect(190,112-96*th,28,96*th);
+  g.fillStyle=red?'#ff3030':'#30ff70';g.beginPath();g.arc(268,64,24,0,7);g.fill();
+  g.fillStyle='#d8e4f5';g.font='bold 22px sans-serif';g.fillText(info,310,72);d.t.needsUpdate=true;}
+const deskMat=std(0x2a2f38,{roughness:.6}),cabSeatMat=std(0x6b2d2d);
+function makeLoco(){
+  const g=new THREE.Group(),bl=std(0x1c4aa8,{roughness:.45,metalness:.3}),doors=[];
+  box(2.9,.5,22,coachDarkMat,0,.6,0,g);
+  box(3.1,3.45,18.4,bl,0,2.575,-1.8,g);box(3.14,.35,18.4,M.white,0,2.9,-1.8,g,{cast:false});box(3.14,.12,18.4,M.yellow,0,2.45,-1.8,g,{cast:false});
+  box(2.5,.2,18.4,M.dark,0,4.4,-1.8,g);
+  /* केबिन (आगे का हिस्सा) */
+  box(3.0,.12,3.6,M.dark,0,1.35,9.2,g);
+  box(3.1,.15,3.6,bl,0,4.375,9.2,g);box(.6,.05,.3,M.lamp,0,4.28,9.2,g,{cast:false});
+  box(3.1,1.25,.15,bl,0,1.475,10.925,g);box(3.1,.6,.15,bl,0,4.0,10.925,g);
+  [-1.4,1.4].forEach(x=>box(.3,1.6,.15,bl,x,2.9,10.925,g));
+  box(2.5,1.6,.04,M.glass,0,2.9,10.95,g,{cast:false});
+  [-1,1].forEach(s=>{
+    box(.12,1.45,.6,bl,s*1.5,1.575,7.7,g);box(.12,1.45,1.6,bl,s*1.5,1.575,10.2,g);
+    box(.12,.5,1.4,coachDarkMat,s*1.5,1.1,8.7,g);
+    box(.12,.8,3.6,bl,s*1.5,3.9,9.2,g);
+    box(.06,1.2,.6,M.glass,s*1.5,2.9,7.7,g,{cast:false});box(.06,1.2,1.6,M.glass,s*1.5,2.9,10.2,g,{cast:false});
+    const piv=new THREE.Group();piv.position.set(s*1.55,2.425,8.0);g.add(piv);
+    box(.1,2.15,1.4,bl,0,0,.7,piv);box(.12,.6,.8,M.glass,0,.55,.7,piv,{cast:false});box(.14,.06,.2,M.metal,0,-.1,1.15,piv,{cast:false});
+    doors.push({piv,s});
+    const sg=signMesh(1.5,.45,[{t:'🚪 ड्राइवर केबिन',s:56,c:'#fff'}],'#c62828',true);sg.position.set(s*1.57,3.95,8.7);sg.rotation.y=Math.PI/2;g.add(sg);
+  });
+  /* अंदर: डेस्क, डैशबोर्ड, सीट */
+  box(2.6,.7,.5,deskMat,0,1.7,10.55,g,{cast:false});box(2.6,.06,.52,M.dark,0,2.07,10.55,g,{cast:false});
+  const dash=makeDash(),dm=new THREE.Mesh(new THREE.PlaneGeometry(2.0,.5),new THREE.MeshBasicMaterial({map:dash.t}));dm.rotation.set(.9,Math.PI,0);dm.position.set(0,2.17,10.3);g.add(dm);
+  [-.9,.9].forEach(x=>{const k=new THREE.Mesh(new THREE.SphereGeometry(.06,8,6),M.sigR);k.position.set(x,2.12,10.6);g.add(k);});
+  box(.5,.12,.5,cabSeatMat,0,1.85,8.7,g,{cast:false});box(.5,.75,.1,cabSeatMat,0,2.3,8.4,g,{cast:false});box(.1,.5,.1,M.metal,0,1.6,8.7,g,{cast:false});
+  [-.9,.9].forEach(x=>{const h=new THREE.Mesh(new THREE.SphereGeometry(.18,8,6),M.lamp);h.position.set(x,1.7,11.02);g.add(h);});
+  [-.8,.8].forEach(x=>box(.35,.35,.5,M.metal,x,.9,11.3,g,{cast:false}));
+  box(.35,.35,.5,M.metal,0,.9,-11.3,g,{cast:false});
+  [-7,0,7].forEach(z=>{box(.1,.1,3.2,M.metal,0,4.85,z,g,{cast:false});box(.1,.7,.1,M.metal,-.9,4.65,z,g,{cast:false});box(.1,.7,.1,M.metal,.9,4.65,z,g,{cast:false});box(2.2,.07,.07,M.metal,0,5.2,z,g,{cast:false});});
+  [-7.5,7.5].forEach(z=>{box(2.6,.5,4,coachDarkMat,0,.48,z,g);[-.7175,.7175].forEach(x=>[-1.2,0,1.2].forEach(s=>{const w=new THREE.Mesh(wheelGeo,coachDarkMat);w.rotation.z=Math.PI/2;w.position.set(x,.45,z+s);g.add(w);}));});
+  g.userData={doors,dash};return g;}
+
+/* ================= ट्रेन ================= */
+const trains=[];let userTrain=null;
+const TRAIN_NAMES=['भोपाल शताब्दी एक्सप्रेस','वंदे भारत एक्सप्रेस','पंजाब मेल','जबलपुर इंटरसिटी','नर्मदा एक्सप्रेस','सतना पैसेंजर','मालवा एक्सप्रेस','महाकौशल एक्सप्रेस','इंदौर इंटरसिटी','गोंडवाना एक्सप्रेस'];
+class Train{
+  constructor(k,kind,nc,name,isUser){
+    this.k=k;this.dir=SIG[k].dir;this.x=TRK[k];this.kind=kind;this.isUser=!!isUser;this.name=name;this.num=String(Math.floor(rnd(10000,22999)));this.vis=true;this.disposed=false;
+    this.parts=[];const lo=makeLoco();scene.add(lo);this.parts.push({obj:lo,len:22,loco:true});
+    for(let i=0;i<nc;i++){const c=makeCoach(kind,i);scene.add(c);this.parts.push({obj:c,len:20,loco:false});}
+    this.len=this.parts.reduce((s,p)=>s+p.len+.4,0);this.stopFront=this.dir*92;this.front=-this.dir*330;this.speed=0;this.dz=0;this.state='arrive';this.t=0;
+    this.doorT=0;this.doorV=0;this.seats=[];
+    this.parts.forEach((p,i)=>{if(!p.loco)COACH_SLOTS.forEach(s=>this.seats.push({i,dx:this.dir*s.lx,dz:this.dir*s.lz,pax:null}));});
+    this.place();}
+  center(i){let off=0;for(let j=0;j<i;j++)off+=this.parts[j].len+.4;off+=this.parts[i].len/2;return this.front-this.dir*off;}
+  place(){this.parts.forEach((p,i)=>{p.z=this.center(i);p.obj.position.set(this.x,0,p.z);p.obj.rotation.y=this.dir>0?0:Math.PI;});}
+  setK(k){this.k=k;this.dir=SIG[k].dir;this.x=TRK[k];this.stopFront=this.dir*92;this.place();}
+  doors(){const r=[];this.parts.forEach((p,i)=>{if(!p.loco){r.push({z:p.z-8,i},{z:p.z+8,i});}});return r;}
+  anim(dt){this.doorV+=(this.doorT-this.doorV)*Math.min(1,dt*3);this.parts[0].obj.userData.doors.forEach(d=>d.piv.rotation.y=d.s*1.6*this.doorV);}
+  dispose(){this.disposed=true;this.parts.forEach(p=>{scene.remove(p.obj);p.obj.traverse(o=>{if(o.geometry&&o.geometry!==wheelGeo)o.geometry.dispose();});});}
+  move(dt){const old=this.front;this.front+=this.dir*this.speed*dt;this.dz=this.front-old;this.place();}
+  update(dt){   /* सिर्फ AI ट्रेनें */
+    const sg=SIG[this.k],dist=(this.stopFront-this.front)*this.dir;
+    if(this.state==='arrive'){
+      let tv=Math.min(24,Math.max(.8,Math.sqrt(Math.max(0,2*.95*(dist-.2)))));
+      this.speed+=clamp(tv-this.speed,-2.4*dt,1.3*dt);this.move(dt);
+      if(!sg.home.red&&this.front*this.dir>-120)sg.home.set(true);
+      if(dist<.35){this.front=this.stopFront;this.speed=0;this.dz=0;this.place();this.state='dwell';this.t=0;onDwellStart(this);}
+    }else if(this.state==='dwell'){this.dz=0;this.t+=dt;if(this.t>40){forceBoard(this);this.state='depart';sg.start.set(false);setDisplay(this.k,this.name+' '+this.num,'रवाना हो रही है →');speak(this.name+' प्लेटफॉर्म नंबर '+(this.k+1)+' से रवाना हो रही है। यात्रीगण कृपया सावधान रहें।');tone(500,.4,'square',.07);}}
+    else if(this.state==='depart'){this.speed=Math.min(26,this.speed+.9*dt);this.move(dt);
+      if(this.front*this.dir>112)sg.start.set(true);
+      if(this.front*this.dir>420)this.state='gone';}
+  }
+}
+const displays=PLAT.map((p,k)=>{const W=512,H=150,c=document.createElement('canvas');c.width=W;c.height=H;const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(2.8,.82),new THREE.MeshBasicMaterial({map:t,side:THREE.DoubleSide}));m.position.set(p.cx,3.6,30);station.add(m);
+  box(.05,1.5,.05,M.dark,p.cx,4.55,30,station,{cast:false});return {c,t,k};});
+function setDisplay(k,l1,l2){const d=displays[k],g=d.c.getContext('2d');g.fillStyle='#050505';g.fillRect(0,0,512,150);g.fillStyle='#ffb000';g.textAlign='center';
+  g.font='bold 30px sans-serif';g.fillText('पटरी '+(k+1)+' · TRACK '+(k+1),256,36);g.font='bold 32px sans-serif';g.fillText(l1,256,82);g.fillStyle='#5dff7a';g.font='bold 30px sans-serif';g.fillText(l2,256,126);d.t.needsUpdate=true;}
+const spawnT=[999,999,999];
+function spawnAI(k,instant){
+  const nm=pick(TRAIN_NAMES),kind=pick(['icf','icf','lhb','vb']);
+  const t=new Train(k,kind,rnd(0,1)<.5?6:8,nm,false);trains.push(t);SIG[k].home.set(false);SIG[k].start.set(true);
+  fillSeats(t,instant?.35:.4,28);
+  if(instant){t.front=t.stopFront;t.state='dwell';t.t=8;t.place();SIG[k].home.set(true);onDwellStart(t,true);}
+  else{setDisplay(k,nm+' '+t.num,'आ रही है ▶');chime();setTimeout(()=>speak('यात्रीगण कृपया ध्यान दें। '+nm+', गाड़ी संख्या '+t.num.split('').join(' ')+', पटरी नंबर '+(k+1)+' पर आ रही है।'),700);}
+  return t;}
+function releaseTrain(t){paxList.forEach(p=>{if(p.active&&((p.ride&&p.ride.t===t)||p.boardT===t))p.hide();});}
+function clearAI(){for(let i=trains.length-1;i>=0;i--){const t=trains[i];if(!t.isUser){releaseTrain(t);t.dispose();trains.splice(i,1);}}}
+
+/* ================= यात्री (असली इंसान जैसे) ================= */
+const VC=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.85,metalness:0});
+const cyl=(a,b,h,n)=>new THREE.CylinderGeometry(a,b,h,n||10),sph=r=>new THREE.SphereGeometry(r,10,8),bx=(w,h,d)=>new THREE.BoxGeometry(w,h,d);
+function mergeParts(parts){
+  const pos=[],nor=[],col=[];
+  parts.forEach(p=>{
+    const g=p.geo.index?p.geo.toNonIndexed():p.geo.clone();
+    g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(p.x||0,p.y||0,p.z||0),new THREE.Quaternion().setFromEuler(new THREE.Euler(p.rx||0,p.ry||0,p.rz||0)),new THREE.Vector3(p.sx||1,p.sy||1,p.sz||1)));
+    const c=new THREE.Color(p.color),pa=g.attributes.position.array,na=g.attributes.normal.array;
+    for(let i=0;i<pa.length;i++){pos.push(pa[i]);nor.push(na[i]);}
+    for(let i=0;i<pa.length/3;i++)col.push(c.r,c.g,c.b);
+    g.dispose();});
+  const o=new THREE.BufferGeometry();
+  o.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));o.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3));o.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  return o;}
+function buildVariant(o){
+  const B=[],skin=o.skin,sh=o.shirt;
+  B.push({geo:bx(.34,.2,.2),color:o.pant,y:.95});
+  B.push({geo:cyl(.17,.15,.55,12),color:sh,y:1.2,sz:.68});
+  [-1,1].forEach(s=>{B.push({geo:sph(.065),color:sh,x:s*.2,y:1.43});B.push({geo:sph(.025),color:skin,x:s*.112,y:1.66});B.push({geo:sph(.014),color:'#111111',x:s*.04,y:1.675,z:.1});});
+  B.push({geo:cyl(.05,.055,.1,8),color:skin,y:1.53});
+  B.push({geo:sph(.115),color:skin,y:1.66,sy:1.15});
+  B.push({geo:sph(.02),color:skin,y:1.645,z:.118});
+  if(o.hat==='turban'){B.push({geo:sph(.13),color:o.turban||'#f2f2f2',y:1.74,sx:1.05,sy:.85,sz:1.1});}
+  else{B.push({geo:sph(.12),color:o.hair,y:1.715,z:-.03,sy:.75});
+    if(o.hat==='cap')B.push({geo:cyl(.1,.11,.065,12),color:'#f5f5f5',y:1.78,z:-.02});}
+  if(o.sex==='f')B.push({geo:sph(.1),color:o.hair,y:1.55,z:-.085,sy:1.9,sz:.7});
+  if(o.mus)B.push({geo:bx(.07,.013,.02),color:o.hair,y:1.628,z:.113});
+  if(o.kurta)B.push({geo:cyl(.175,.21,.5,12),color:sh,y:.82,sz:.75});
+  if(o.saree){B.push({geo:cyl(.17,.27,.8,14),color:o.saree,y:.55,sz:.8});B.push({geo:bx(.1,.62,.04),color:o.saree2||'#f5c518',y:1.22,z:.105,rz:.5});}
+  if(o.bag)B.push({geo:bx(.28,.36,.12),color:o.bagc||'#37474f',y:1.25,z:-.17});
+  if(o.bag2)B.push({geo:bx(.2,.17,.07),color:o.bagc||'#6d4c41',x:.27,y:.92});
+  const legc=o.saree||o.pant,L=[
+    {geo:cyl(.09,.07,.46,8),color:legc,y:-.23},{geo:cyl(.065,.055,.44,8),color:o.saree?skin:legc,y:-.68},{geo:bx(.1,.07,.25),color:'#1a1a1a',y:-.91,z:.05}];
+  const A=[{geo:cyl(.052,.047,.28,8),color:sh,y:-.14},{geo:cyl(.042,.036,.26,8),color:o.sleeve==='long'?sh:skin,y:-.41},{geo:sph(.042),color:skin,y:-.57}];
+  return {body:mergeParts(B),leg:mergeParts(L),arm:mergeParts(A),scale:o.scale||1};}
+const SKN=['#c68642','#8d5524','#e0ac69','#a1663a','#d9a066'],HAIR=['#111111','#1b1410','#2b1d14','#8a8a8a'];
+const SHT=['#c0392b','#2980b9','#27ae60','#f39c12','#ecf0f1','#e67e22','#16a085','#d35400','#5d6d7e','#7d3c98','#f1c40f','#1abc9c'],PNT=['#222222','#2c3e50','#4a4a4a','#5d4037','#1b2a49','#7b8794'],SAR=['#c2185b','#1e88e5','#f9a825','#2e7d32','#6a1b9a','#e53935','#00897b'];
+function randomVariant(){
+  const r=Math.random(),o={skin:pick(SKN),hair:pick(HAIR),shirt:pick(SHT),pant:pick(PNT),hat:'none',sleeve:Math.random()<.5?'long':'short',bag:Math.random()<.45,bag2:false,bagc:pick(['#37474f','#b71c1c','#1a237e','#4e342e','#33691e'])};
+  if(r<.5){o.sex='m';o.mus=Math.random()<.4;const h=Math.random();if(h<.15)o.hat='turban',o.turban=pick(['#f2f2f2','#e65100','#1565c0','#fdd835']);else if(h<.3)o.hat='cap';if(Math.random()<.3){o.kurta=true;o.pant='#eeeeee';}}
+  else if(r<.82){o.sex='f';o.bag=false;o.bag2=Math.random()<.5;o.sleeve='short';if(Math.random()<.65){o.saree=pick(SAR);o.saree2=pick(['#f5c518','#ffffff','#ff7043']);}else{o.kurta=true;o.shirt=pick(SAR);o.sleeve='long';}}
+  else{o.sex='k';o.scale=.62;o.bag=Math.random()<.5;o.hair='#111111';}
+  return buildVariant(o);}
+const VARIANTS=Array.from({length:18},randomVariant);
+const SHGEO=new THREE.CircleGeometry(.34,12),SHMAT=new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.28,depthWrite:false});
+function makePerson(realShadow){
+  const g=new THREE.Group(),body=new THREE.Mesh(new THREE.BufferGeometry(),VC);g.add(body);
+  const mk=(x,y)=>{const piv=new THREE.Group();piv.position.set(x,y,0);const m=new THREE.Mesh(new THREE.BufferGeometry(),VC);piv.add(m);g.add(piv);return {piv,m};};
+  const lL=mk(-.1,.945),lR=mk(.1,.945),aL=mk(-.22,1.43),aR=mk(.22,1.43);
+  const ms=[body,lL.m,lR.m,aL.m,aR.m];let sh=null;
+  if(realShadow)ms.forEach(m=>m.castShadow=true);
+  else{sh=new THREE.Mesh(SHGEO,SHMAT);sh.rotation.x=-Math.PI/2;sh.position.y=.015;g.add(sh);}
+  const o={g,sc:1,
+    setVariant(v){body.geometry=v.body;lL.m.geometry=lR.m.geometry=v.leg;aL.m.geometry=aR.m.geometry=v.arm;g.scale.setScalar(v.scale);o.sc=v.scale;},
+    animate(ph,amt){const s=Math.sin(ph)*amt;lL.piv.rotation.x=s*.75;lR.piv.rotation.x=-s*.75;aL.piv.rotation.x=-s*.6;aR.piv.rotation.x=s*.6;},
+    lite(on){[lL.piv,lR.piv,aL.piv,aR.piv].forEach(p=>p.visible=!on);if(sh)sh.visible=!on;}};
+  return o;}
+const paxList=[];
+class Pax{
+  constructor(){this.p=makePerson(false);this.g=this.p.g;this.g.visible=false;scene.add(this.g);this.active=false;this.path=[];this.moving=false;this.state='stand';
+    this.x=this.z=this.y=0;this.ph=0;this.ride=null;this.resv=null;this.boardT=null;this.onEnd=null;this.wait=0;this.spd=1.2;this.qi=-1;this.qT=0;this.qNeed=4;this.plat=0;}
+  spawn(x,z,y,path,plat){this.active=true;this.ride=null;this.resv=null;this.boardT=null;this.x=x;this.z=z;this.y=y;this.path=path;this.plat=plat;this.wait=0;this.ph=rnd(0,6);this.spd=rnd(1.0,1.5);
+    this.state='walk';this.onEnd=null;this.moving=false;this.qi=-1;this.qT=0;this.p.setVariant(pick(VARIANTS));this.p.lite(false);this.p.animate(0,0);this.g.visible=true;this.sync();}
+  sync(){this.g.position.set(this.x,this.y+(this.moving?Math.abs(Math.sin(this.ph))*.025:0),this.z);}
+  seat(t,slot){this.ride={t,i:slot.i,dx:slot.dx,dz:slot.dz,slot};slot.pax=this;this.resv=null;this.boardT=null;this.path=[];this.onEnd=null;this.moving=false;this.state='sit';
+    this.p.lite(true);this.g.rotation.y=t.dir>0?0:Math.PI;this.place();}
+  place(){const r=this.ride,pt=r.t.parts[r.i];this.x=r.t.x+r.dx;this.z=pt.z+r.dz;this.y=FLOORY+.6-.95*this.p.sc;this.g.position.set(this.x,this.y,this.z);}
+  hide(){if(this.ride&&this.ride.slot&&this.ride.slot.pax===this)this.ride.slot.pax=null;if(this.resv&&this.resv.pax===this)this.resv.pax=null;
+    this.ride=null;this.resv=null;this.boardT=null;this.active=false;this.g.visible=false;}
+  update(dt){
+    if(!this.active)return;
+    if(this.ride){this.place();return;}
+    if(this.wait>0){this.wait-=dt;if(this.moving){this.moving=false;this.p.animate(0,0);this.sync();}return;}
+    const wp=this.path[0];
+    if(!wp){this.state='stand';if(this.moving){this.moving=false;this.p.animate(0,0);this.sync();}if(this.onEnd){const f=this.onEnd;this.onEnd=null;f(this);}return;}
+    const dx=wp.x-this.x,dz=wp.z-this.z,d=Math.hypot(dx,dz),st=this.spd*dt;this.state='walk';this.moving=true;this.ph+=dt*this.spd*6.5;this.p.animate(this.ph,1);
+    if(d<=st){this.x=wp.x;this.z=wp.z;this.y=wp.y;this.path.shift();if(wp.wait)this.wait=wp.wait;}
+    else{this.x+=dx/d*st;this.z+=dz/d*st;this.y+=(wp.y-this.y)*Math.min(1,st/d);this.g.rotation.y=Math.atan2(dx,dz);}
+    this.sync();}
+}
+for(let i=0;i<120;i++)paxList.push(new Pax());
+const freePax=()=>paxList.find(p=>!p.active);
+const activePax=()=>paxList.reduce((n,p)=>n+(p.active?1:0),0);
+function fillSeats(t,frac,max){let n=0;const slots=t.seats.filter(s=>!s.pax).sort(()=>Math.random()-.5);
+  for(const s of slots){if(n>=max)break;if(Math.random()>frac)continue;const p=freePax();if(!p)break;p.spawn(0,0,0,[],t.k);p.seat(t,s);n++;}}
+function forceBoard(t){paxList.forEach(p=>{if(p.active&&p.boardT===t&&!p.ride&&p.resv)p.seat(t,p.resv);});}
+function boardingActive(t){return paxList.some(p=>p.active&&p.boardT===t&&!p.ride);}
+
+/* ---- रास्ते: सीढ़ी, पुल, निकास ---- */
+function stairPts(k){const cx=PLAT[k].cx;return [{x:cx,z:-52,y:PH},{x:cx,z:-50,y:PH},{x:cx,z:-41.5,y:BY},{x:cx,z:-40,y:BY}];}
+function routeBetween(j,k){if(j===k)return [];return stairPts(j).concat(stairPts(k).slice().reverse());}
+function platSpot(k){const p=PLAT[k];return {x:rnd(p.x0+.8,p.x1-2.2),z:pick([rnd(-90,-60),rnd(-30,90)])};}
+function exitPath(j){
+  const r=routeBetween(j,0);r.push({x:-14,z:0,y:PH},{x:-18.8,z:0,y:PH},{x:-30,z:rnd(-3,3),y:PH},{x:-40.5,z:0,y:PH},{x:-44,z:rnd(-3,3),y:0},{x:-62,z:rnd(-10,10),y:0});return r;}
+function spawnWaiting(k){const p=freePax();if(!p)return;const s=platSpot(k);p.spawn(s.x,s.z,PH,[],k);p.state='stand';p.sync();p.g.rotation.y=rnd(0,6.28);}
+
+/* ---- टिकट खिड़की: बाबू, कतार, टिकट मिलना ---- */
+const QZ=-32.0,slotZ=i=>QZ+1.0*i;
+const tkTex=(()=>{const c=document.createElement('canvas');c.width=256;c.height=96;const g=c.getContext('2d');g.fillStyle='rgba(255,255,255,.95)';g.fillRect(0,0,256,96);g.strokeStyle='#0d3b73';g.lineWidth=6;g.strokeRect(3,3,250,90);
+  g.fillStyle='#0d3b73';g.font='bold 44px sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('🎫 टिकट!',128,50);const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;return t;})();
+const clerkV=[0,1,2,3].map(i=>buildVariant({sex:'m',skin:pick(SKN),hair:i%2?'#2b2b2b':'#111111',shirt:'#eceff1',pant:'#263238',sleeve:'short',hat:'none',mus:i%2===0,bag:false}));
+const WIN=TICKET_WIN.map((w,i)=>{
+  const o={x:w.x,q:[],spr:null,sprT:0},c=makePerson(false);c.setVariant(clerkV[i]);c.g.position.set(w.x,PH,-34.35);c.g.rotation.y=0;scene.add(c.g);
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:tkTex,transparent:true,depthTest:false}));s.scale.set(1.9,.7,1);s.position.set(w.x,PH+2.7,-31.6);s.visible=false;scene.add(s);o.spr=s;return o;});
+let ticketsSold=0;
+function buyTicket(w,p){
+  w.spr.visible=true;w.sprT=1.6;ticketsSold++;p.qi=-99;p.qT=0;const k=p.plat;
+  const path=[{x:w.x,z:-27,y:PH},{x:-24,z:0,y:PH},{x:-18.8,z:0,y:PH},{x:-14,z:0,y:PH}];routeBetween(0,k).forEach(q=>path.push(q));
+  const s=platSpot(k);path.push({x:s.x,z:s.z,y:PH});p.path=path;p.onEnd=null;}
+function updateQueues(dt){
+  WIN.forEach(w=>{
+    if(w.sprT>0){w.sprT-=dt;if(w.sprT<=0)w.spr.visible=false;}
+    w.q.forEach((p,i)=>{
+      if(!p.active)return;
+      if(p.qi!==i){p.qi=i;p.path=[{x:w.x,z:slotZ(i),y:PH}];p.wait=0;}
+      if(i===0&&p.path.length===0&&!p.moving&&p.wait<=0){p.qT+=dt;if(p.qT>p.qNeed)buyTicket(w,p);}
+    });
+    w.q=w.q.filter(p=>p.active&&p.qi!==-99);
+  });}
+function seedQueues(){
+  WIN.forEach(w=>{const n=Math.floor(rnd(1,3.6));for(let i=0;i<n;i++){const p=freePax();if(!p)return;
+    p.spawn(w.x+rnd(-.12,.12),slotZ(i),PH,[],pick([0,1,2]));p.state='stand';p.qNeed=rnd(2.5,6)+i*1.5;p.qi=i;p.qT=rnd(0,2);p.g.rotation.y=Math.PI;w.q.push(p);p.sync();}});}
+function spawnEntrant(){
+  const p=freePax();if(!p||activePax()>105)return;
+  const w=WIN.reduce((a,b)=>b.q.length<a.q.length?b:a);if(w.q.length>=5)return;
+  const k=pick([0,0,1,1,2,2]),z0=rnd(-3,3);
+  p.spawn(-62,rnd(-10,10),0,[{x:-44,z:z0,y:0},{x:-40.5,z:z0,y:PH},{x:w.x,z:-24,y:PH}],k);p.qNeed=rnd(3,5.5);
+  p.onEnd=q=>{q.qi=-1;q.qT=0;w.q.push(q);};}
+
+/* ---- ट्रेन रुकी: कुछ उतरें, कुछ चढ़कर सीट पर बैठें ---- */
+function onDwellStart(t,silent){
+  const k=t.k;setDisplay(k,t.name+' '+t.num,'पटरी पर खड़ी है');if(!silent&&!t.isUser)tone(700,.3,'sine',.08);
+  const doors=t.doors(),xp=TRK[k]-2.8,xd=TRK[k]-1.0,nd=z=>doors.reduce((a,b)=>Math.abs(b.z-z)<Math.abs(a.z-z)?b:a);
+  const riders=paxList.filter(p=>p.active&&p.ride&&p.ride.t===t).sort(()=>Math.random()-.5);
+  riders.slice(0,Math.ceil(riders.length*.55)).forEach((p,ix)=>{
+    const r=p.ride,sx=t.x+r.dx,sz=t.parts[r.i].z+r.dz,d=nd(sz);
+    if(r.slot&&r.slot.pax===p)r.slot.pax=null;p.ride=null;p.p.lite(false);p.x=sx;p.z=sz;p.y=FLOORY;p.sync();
+    p.path=[{x:t.x,z:sz,y:FLOORY},{x:t.x,z:d.z,y:FLOORY},{x:xd,z:d.z,y:FLOORY},{x:xp,z:d.z,y:PH}].concat(exitPath(k));
+    p.wait=ix*.7+rnd(0,2.5);p.state='walk';p.onEnd=q=>q.hide();});
+  const waiting=paxList.filter(p=>p.active&&!p.ride&&p.plat===k&&p.state==='stand'&&p.path.length===0&&p.y===PH&&p.qi<0&&p.x>=PLAT[k].x0&&p.x<=PLAT[k].x1);
+  waiting.sort((a,b)=>Math.abs(nd(a.z).z-a.z)-Math.abs(nd(b.z).z-b.z));
+  waiting.slice(0,24).forEach(p=>{
+    const d=nd(p.z),free=t.seats.filter(s=>!s.pax),near=free.filter(s=>s.i===d.i),slot=pick(near.length?near:free);if(!slot)return;
+    slot.pax=p;p.resv=slot;p.boardT=t;const sx=t.x+slot.dx,sz=t.parts[slot.i].z+slot.dz;
+    p.path=[{x:xp,z:d.z+rnd(-.5,.5),y:PH},{x:xd,z:d.z,y:FLOORY},{x:t.x,z:d.z,y:FLOORY},{x:t.x,z:sz,y:FLOORY},{x:sx,z:sz,y:FLOORY}];
+    p.wait=rnd(0,7);p.onEnd=q=>{if(!t.disposed&&q.resv)q.seat(t,q.resv);else q.hide();};});
+}
+
+/* ================= खिलाड़ी ================= */
+const P={x:10,z:84,feet:PH,vy:0,yaw:-Math.PI/2,pitch:.25,grounded:true,riding:null};
+let camMode='tp',mode='walk',phase='station',score=0,ticketsBought=0,uk=2,recK=2,started=false;
+const avPerson=makePerson(true);
+avPerson.setVariant(buildVariant({sex:'m',skin:'#c68642',hair:'#111111',shirt:'#e8731a',pant:'#2b3a55',sleeve:'long',hat:'cap',mus:false,bag:true,bagc:'#263238'}));
+const avatar=avPerson.g;avatar.scale.multiplyScalar(1.04);scene.add(avatar);let avMoving=false;
+const dirYaw=()=>userTrain&&userTrain.dir<0?Math.PI:0;
+
+function surfaceY(x,z,feet){
+  let best=0;const lim=feet+.5;
+  const tryS=y=>{if(y<=lim&&y>best)best=y;};
+  PLAT.forEach(p=>{if(x>=p.x0&&x<=p.x1){if(z>=-100&&z<=100)tryS(PH);else if(z>100&&z<=108)tryS(PH*(108-z)/8);else if(z<-100&&z>=-108)tryS(PH*(z+108)/8);}});
+  if(x>=BLD.x0&&x<=-17&&z>=BLD.z0&&z<=BLD.z1)tryS(PH);
+  PLAT.forEach(p=>{if(x>=p.cx-1.2&&x<=p.cx+1.2&&z>=STAIR.z0&&z<=STAIR.z1)tryS(PH+(z-STAIR.z0)/(STAIR.z1-STAIR.z0)*(BY-PH));});
+  if(x>=FOB.x0&&x<=FOB.x1&&z>=FOB.z0&&z<=FOB.z1)tryS(BY);
+  lifts.forEach(L=>{if(Math.abs(x-L.cx)<1&&z>=-38.4&&z<=-36.4)tryS(L.y);});
+  trains.forEach(t=>t.parts.forEach(p=>{if(p.loco)return;if(Math.abs(x-t.x)<1.5&&Math.abs(z-p.z)<10.1)tryS(FLOORY);}));
+  return best;}
+function inRect(t,p,x,z,m){const lx=Math.abs(x-t.x),lz=Math.abs(z-p.z);return lx<1.6+m&&lz<(p.loco?11:10)+m;}
+function trainBlocks(ox,oz,nx,nz,feet){
+  if(feet>FLOORY+.6)return false;
+  for(const t of trains){
+    for(const p of t.parts){
+      const a=inRect(t,p,ox,oz,0),b=inRect(t,p,nx,nz,0);
+      if(a===b)continue;
+      if(p.loco)return true;
+      if(ox!==nx){if(t.speed>.4)return true;if(Math.abs(Math.abs(oz-p.z)-8)<.62)continue;return true;}
+      if(Math.abs(nx-t.x)<.85)continue;return true;
+    }}
+  return false;}
+function wallBlocks(x,z,feet){
+  for(const w of WALLS){if(feet>=w.top-.35)continue;
+    const cx=clamp(x,w.x0,w.x1),cz=clamp(z,w.z0,w.z1);if((x-cx)*(x-cx)+(z-cz)*(z-cz)<.1225)return true;}
+  return false;}
+function movePlayer(dx,dz){
+  const nx=P.x+dx,nz=P.z+dz;
+  if(!wallBlocks(nx,P.z,P.feet)&&!trainBlocks(P.x,P.z,nx,P.z,P.feet))P.x=nx;
+  if(!wallBlocks(P.x,nz,P.feet)&&!trainBlocks(P.x,P.z,P.x,nz,P.feet))P.z=nz;
+  P.x=clamp(P.x,-160,150);P.z=clamp(P.z,-340,340);}
+
+/* ================= इनपुट ================= */
+const key={};let jx=0,jy=0,lookId=null,lastX=0,lastY=0,joyId=null;
+addEventListener('keydown',e=>{key[e.code]=true;if(e.code==='KeyE')doUse();if(e.code==='KeyH')horn();if(e.code==='KeyV')toggleCam();if(e.code==='Space'&&mode==='walk')jump();});
+addEventListener('keyup',e=>key[e.code]=false);
+const joy=$('joy'),knob=$('knob');
+function joyMove(e){const r=joy.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=e.clientX-cx,dy=e.clientY-cy;const m=Math.hypot(dx,dy),R=50;if(m>R){dx*=R/m;dy*=R/m;}
+  jx=dx/R;jy=dy/R;knob.style.transform='translate('+dx+'px,'+dy+'px)';}
+joy.addEventListener('pointerdown',e=>{joyId=e.pointerId;joy.setPointerCapture(e.pointerId);joyMove(e);e.preventDefault();});
+joy.addEventListener('pointermove',e=>{if(e.pointerId===joyId)joyMove(e);});
+const joyEnd=e=>{if(e.pointerId===joyId){joyId=null;jx=jy=0;knob.style.transform='';}};joy.addEventListener('pointerup',joyEnd);joy.addEventListener('pointercancel',joyEnd);
+const cv=$('c');
+cv.addEventListener('pointerdown',e=>{if(lookId===null){lookId=e.pointerId;lastX=e.clientX;lastY=e.clientY;cv.setPointerCapture(e.pointerId);}});
+cv.addEventListener('pointermove',e=>{if(e.pointerId!==lookId)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;lastX=e.clientX;lastY=e.clientY;
+  P.yaw-=dx*.0055;P.pitch=clamp(P.pitch+dy*.004,-.5,1.2);if(mode==='drive'){P.yaw=clamp(P.yaw,dirYaw()-1.5,dirYaw()+1.5);P.pitch=clamp(P.pitch,-.3,.5);}});
+const lookEnd=e=>{if(e.pointerId===lookId)lookId=null;};cv.addEventListener('pointerup',lookEnd);cv.addEventListener('pointercancel',lookEnd);
+function bind(id,down,up){const e=$(id);e.addEventListener('pointerdown',ev=>{ev.preventDefault();ev.stopPropagation();e.classList.add('on');down&&down();});
+  const u=ev=>{e.classList.remove('on');up&&up();};e.addEventListener('pointerup',u);e.addEventListener('pointercancel',u);e.addEventListener('pointerleave',u);}
+let braking=false,thr=0,autoStop=false,mapOn=true;
+bind('btnUse',()=>doUse());bind('btnJump',()=>{if(mode==='walk')jump();});bind('btnHorn',()=>horn());
+bind('btnCam',()=>toggleCam());bind('btnTime',()=>setNight(!night));bind('btnSnd',()=>{soundOn=!soundOn;$('btnSnd').textContent=soundOn?'🔊':'🔇';if(!soundOn&&engGain)engGain.gain.value=0;});
+bind('btnFs',()=>{const d=document.documentElement;if(document.fullscreenElement){document.exitFullscreen();}else if(d.requestFullscreen){d.requestFullscreen().then(()=>{try{screen.orientation.lock('landscape');}catch(e){}}).catch(()=>{});}});
+bind('btnMap',()=>{mapOn=!mapOn;$('map').style.display=mapOn?'block':'none';});
+bind('btnLoco',()=>gotoCab());
+bind('thrUp',()=>{thr=Math.min(1,thr+.25);});bind('thrDn',()=>{thr=Math.max(0,thr-.25);});
+bind('brk',()=>{braking=true;},()=>{braking=false;});
+bind('autoBtn',()=>{autoStop=!autoStop;$('autoBtn').classList.toggle('sel',autoStop);toast(autoStop?'🅰 ऑटो-स्टॉप चालू: ट्रेन खुद सही जगह रुकेगी':'ऑटो-स्टॉप बंद');});
+bind('exitCab',()=>exitCab());
+bind('rt1',()=>switchTrack(0));bind('rt3',()=>switchTrack(2));
+function toggleCam(){camMode=camMode==='tp'?'fp':'tp';}
+function jump(){if(P.grounded){P.vy=5.4;P.grounded=false;}}
+
+/* ================= इंजन में बैठना / ट्रेन चलाना ================= */
+let ctxPrompt=null,arrivedT=0,stopScored=false,remainKm=0,passedHome=false,passedStart=false,userDwell=0,homeRedT=0,camAnim=null,doorCloseT=0,lastWarn=0,dashT=0,mapT=0;
+function cabDoorPos(t){return {x:t.x-2.45,z:t.parts[0].z+t.dir*8.7};}
+function nearCab(){
+  if(!userTrain||phase!=='station'||mode!=='walk')return false;
+  const d=cabDoorPos(userTrain);return Math.hypot(P.x-d.x,P.z-d.z)<3.4&&userTrain.speed<.3&&P.feet<PH+.5;}
+function gotoCab(){
+  if(mode!=='walk')return;
+  if(!userTrain||phase!=='station'||userTrain.speed>.3){toast('ट्रेन अभी स्टेशन पर नहीं है');return;}
+  const d=cabDoorPos(userTrain);P.x=userTrain.x-3.0;P.z=d.z-1.8;P.feet=PH;P.vy=0;P.yaw=-Math.PI/2;toast('🚂 इंजन के दरवाज़े पर आ गए — "उपयोग" दबाएँ');}
+function cabPose(){const t=userTrain,lp=t.parts[0];
+  return {pos:new THREE.Vector3(t.x,2.85,lp.z+t.dir*9.5),q:new THREE.Quaternion().setFromEuler(new THREE.Euler(-P.pitch+.1,P.yaw+Math.PI,0,'YXZ'))};}
+function enterCab(){
+  const t=userTrain;mode='enter';t.doorT=1;camAnim={t:0,p:camera.position.clone(),q:camera.quaternion.clone()};
+  P.yaw=dirYaw();P.pitch=.1;thr=0;braking=false;autoStop=false;$('autoBtn').classList.remove('sel');tone(300,.25,'square',.06);toast('🚪 दरवाज़ा खुल गया… ड्राइवर सीट पर चल रहे हैं',1800);}
+function exitCab(){
+  if(mode!=='drive')return;
+  if(userTrain.speed>.5){toast('पहले ट्रेन रोकें');return;}
+  if(phase!=='station'||userTrain.front<60||userTrain.front>110){toast('प्लेटफॉर्म पर रुककर ही उतर सकते हैं');return;}
+  const t=userTrain,d=cabDoorPos(t);mode='walk';avatar.visible=true;$('drive').style.display='none';
+  P.x=d.x-.6;P.z=d.z-1.2;P.feet=PH;P.vy=0;P.yaw=-Math.PI/2;camMode='tp';thr=0;autoStop=false;t.doorT=1;doorCloseT=4;}
+function clearTrack(k){
+  for(let i=trains.length-1;i>=0;i--){const t=trains[i];if(!t.isUser&&t.k===k){releaseTrain(t);t.dispose();trains.splice(i,1);setDisplay(k,'—','कोई ट्रेन नहीं');SIG[k].home.set(true);SIG[k].start.set(true);}}}
+function routeSelectable(){return !!userTrain&&mode==='drive'&&(phase==='journey'||(phase==='station'&&userTrain.front<-150));}
+function switchTrack(b){
+  if(!routeSelectable()||b===uk)return;
+  const a=uk;uk=b;
+  if(phase==='station'){clearTrack(b);SIG[b].home.set(SIG[a].home.red);SIG[b].start.set(true);SIG[a].home.set(true);SIG[a].start.set(true);spawnT[b]=999;spawnT[a]=rnd(8,16);}
+  userTrain.setK(b);toast('🔀 आपने पटरी '+(b+1)+' चुनी'+(b===recK?'  ✅ सही':'')+'  (प्लेटफॉर्म '+(b===0?'1 / 2':'3')+')');tone(520,.15,'square',.06);}
+function startStation(first){
+  const carry=userTrain?userTrain.speed:0;
+  phase='station';scenery.visible=false;station.visible=true;trackGroups.forEach(g=>{g.visible=true;g.position.z=0;});grassBig.position.set(0,-.02,0);
+  clearAI();paxList.forEach(p=>p.hide());WIN.forEach(w=>w.q.length=0);redrawNames();
+  if(userTrain)userTrain.dispose();trains.length=0;
+  if(first)uk=2;
+  userTrain=new Train(uk,'vb',7,MP[stIdx][0]+' – '+MP[nextIdx][0]+' एक्सप्रेस',true);trains.push(userTrain);
+  SIG.forEach(s=>{s.home.set(true);s.start.set(true);});
+  for(let k=0;k<3;k++){setDisplay(k,'—','कोई ट्रेन नहीं');spawnT[k]=(k===uk)?999:rnd(4+k*3,12+k*3);}
+  fillSeats(userTrain,.45,30);
+  for(let k=0;k<3;k++)for(let i=0;i<8;i++)spawnWaiting(k);
+  seedQueues();
+  if(first){
+    userTrain.front=userTrain.stopFront;userTrain.speed=0;userTrain.state='dwell';userTrain.place();
+    const ai=(uk===2)?0:2;spawnAI(ai,true);spawnT[ai]=999;onDwellStart(userTrain,true);
+    stopScored=true;const d=cabDoorPos(userTrain);P.x=userTrain.x-3.0;P.z=d.z-2.2;P.feet=PH;P.yaw=-Math.PI/2;mode='walk';}
+  else{userTrain.front=-340;userTrain.speed=Math.max(8,carry);userTrain.state='user';userTrain.place();SIG[uk].home.set(Math.random()<.4);homeRedT=rnd(8,14);}
+  stopScored=false;passedHome=false;passedStart=false;userDwell=0;autoStop=false;$('autoBtn').classList.remove('sel');
+}
+function userUpdate(dt){
+  const t=userTrain,sg=SIG[uk];
+  if(doorCloseT>0){doorCloseT-=dt;if(doorCloseT<=0&&mode==='walk')t.doorT=0;}
+  if(mode==='drive'&&t.speed>2)t.doorT=0;
+  if(mode==='drive'){
+    let te=thr,brk=braking;
+    if(autoStop&&phase==='station'&&!passedStart&&!stopScored){
+      const redHome=sg.home.red&&t.front<-125,stopAt=redHome?-138:92,dist=stopAt-t.front,tv=dist>.4?Math.min(26,Math.max(.8,Math.sqrt(2*.9*dist))):0;
+      if(t.speed>tv+.5){brk=true;te=0;}else if(t.speed<tv-.7)te=.55;else te=0;}
+    const a=te*.95-(brk?1.8:0)-.0007*t.speed*t.speed-.03;
+    t.speed=Math.max(0,Math.min(33,t.speed+a*dt));t.dz=t.speed*dt;t.front+=t.dz;t.place();
+  }else if(t.speed>0){t.speed=Math.max(0,t.speed-.4*dt);t.dz=t.speed*dt;t.front+=t.dz;t.place();}else t.dz=0;
+  if(engGain)engGain.gain.value=(soundOn&&mode==='drive')?.03+t.speed*.0022:0;
+  if(engOsc)engOsc.frequency.value=40+t.speed*2.2;
+  if(phase==='station'){
+    userDwell+=dt;
+    if(homeRedT>0){homeRedT-=dt;if(homeRedT<=0)sg.home.set(false);}
+    if(!passedHome&&t.front>-125){passedHome=true;if(sg.home.red&&mode==='drive'){score-=50;toast('🔴 लाल सिग्नल पार किया! −50');tone(200,.8,'square',.12);}}
+    if(t.front>-120&&!sg.home.red)sg.home.set(true);
+    const ready=userDwell>12&&!boardingActive(t);
+    if(t.front>60&&t.front<100)sg.start.set(!ready);
+    if(!passedStart&&t.front>112){passedStart=true;if(sg.start.red&&mode==='drive'){score-=50;toast('🔴 स्टार्टर सिग्नल लाल था! −50');tone(200,.8,'square',.12);}sg.start.set(true);}
+    if(mode==='drive'&&!stopScored&&passedHome){
+      if(t.speed<.15){
+        if(Math.abs(t.front-92)<12){stopScored=true;const pts=Math.round(150-Math.abs(t.front-92)*8);score+=pts;toast('✅ बढ़िया! सही जगह रोकी  +'+pts,3000);userDwell=0;t.state='dwell';thr=0;autoStop=false;$('autoBtn').classList.remove('sel');chime();
+          speak(MP[stIdx][0]+' स्टेशन आ गया है। यात्रीगण कृपया सावधानी से उतरें।');onDwellStart(t);}
+        else if(t.front<80&&performance.now()-lastWarn>6000){lastWarn=performance.now();toast('⚠ थोड़ा और आगे बढ़ाएँ — हरे निशान तक');}
+      }
+      if(t.front>104&&!stopScored){stopScored=true;score-=100;toast('⚠ स्टेशन छूट गया! −100 (ट्रेन को हरे निशान पर रोकना था)',3800);tone(200,.8,'square',.12);}
+    }
+    if(t.front>200){phase='journey';trains.forEach(x=>{if(!x.isUser){releaseTrain(x);x.dispose();}});trains.length=0;trains.push(t);paxList.forEach(p=>{if(!(p.ride&&p.ride.t===t))p.hide();});
+      remainKm=rnd(35,95);nextIdx=(stIdx+1)%MP.length;scenery.visible=true;recK=pick([0,2]);uk=recK;t.setK(uk);
+      toast('🚆 '+MP[stIdx][0]+' से रवाना। अगला: '+MP[nextIdx][0]+' ('+remainKm.toFixed(0)+' km)  •  नक्शे में सुझाई पटरी: '+(recK+1),5000);}
+  }else if(phase==='journey'){
+    remainKm-=Math.abs(t.speed)*dt*24/1000;
+    SC.forEach(s=>{const span=1800,base=Math.floor((t.front-200)/span)*span;let z=base+s.i*45;if(z<t.front-200)z+=span;s.o.position.set(TRK[uk]+s.ox,0,z);});
+    if(t.front>420)station.visible=false;
+    trackGroups.forEach((g,i)=>{g.visible=(i===uk);g.position.z=Math.floor(t.front/65)*65;});
+    grassBig.position.set(0,-.02,Math.floor(t.front/10)*10);
+    if(remainKm<2.5){stIdx=nextIdx;nextIdx=(stIdx+1)%MP.length;station.visible=true;toast('🚉 '+MP[stIdx][0]+' स्टेशन करीब है — गति कम करें, नक्शा देखें!',4500);speak(MP[stIdx][0]+' स्टेशन आने वाला है।');startStation(false);}
+  }
+}
+function doUse(){
+  if(!started)return;
+  if(mode==='drive'||mode==='enter'){horn();return;}
+  const L=lifts.find(l=>Math.abs(P.x-l.cx)<1.6&&P.z>-39.5&&P.z<-35.5);
+  if(L){L.target=(L.target<BY-.1)?BY:PH;tone(600,.15,'square',.05);return;}
+  if(nearCab()){enterCab();return;}
+  const w=TICKET_WIN.find(w=>Math.hypot(P.x-w.x,P.z-(-31.5))<2.4&&P.feet<PH+.5);
+  if(w){const price=Math.round(rnd(40,480)/5)*5;ticketsBought++;score+=10;toast('🎫 टिकट मिल गया!  '+MP[stIdx][0]+' → '+MP[nextIdx][0]+'  ₹'+price);tone(900,.2,'sine',.1);return;}
+  horn();}
+function computeContext(){
+  if(mode!=='walk')return null;
+  if(lifts.find(l=>Math.abs(P.x-l.cx)<1.6&&P.z>-39.5&&P.z<-35.5))return {t:'🛗 लिफ्ट चलाएँ',use:'लिफ्ट'};
+  if(nearCab())return {t:'🚪 इंजन का दरवाज़ा खोलें और ड्राइव करें',use:'ड्राइव'};
+  if(TICKET_WIN.find(w=>Math.hypot(P.x-w.x,P.z-(-31.5))<2.4))return {t:'🎫 टिकट खरीदें',use:'टिकट'};
+  return null;}
+
+/* ================= नक्शा ================= */
+const mapC=$('map'),mg=mapC.getContext('2d'),MZ0=-345,MZ1=135,MX0=-46,MX1=17;
+const MPT=(x,z)=>[(z-MZ0)/(MZ1-MZ0)*mapC.width,(x-MX0)/(MX1-MX0)*mapC.height];
+function drawMap(){
+  const W=mapC.width,H=mapC.height,g=mg;g.setLineDash([]);g.fillStyle='rgba(8,18,34,.84)';g.fillRect(0,0,W,H);
+  PLAT.forEach((p,i)=>{const a=MPT(p.x0,-100),b=MPT(p.x1,100);g.fillStyle='#9aa0a8';g.fillRect(a[0],a[1],b[0]-a[0],b[1]-a[1]);g.fillStyle='#10233f';g.font='bold 9px sans-serif';g.textAlign='center';g.fillText('PF'+(i+1),(a[0]+b[0])/2,(a[1]+b[1])/2+3);});
+  {const a=MPT(BLD.x0,-35),b=MPT(BLD.x1,35);g.fillStyle='#8f3f2c';g.fillRect(a[0],a[1],b[0]-a[0],b[1]-a[1]);g.fillStyle='#fff';g.font='8px sans-serif';g.textAlign='center';g.fillText('भवन',(a[0]+b[0])/2,(a[1]+b[1])/2+3);}
+  {const a=MPT(FOB.x0,-40),b=MPT(FOB.x1,-40);g.strokeStyle='#6ab0ff';g.lineWidth=2;g.setLineDash([3,2]);g.beginPath();g.moveTo(a[0],a[1]);g.lineTo(b[0],b[1]);g.stroke();g.setLineDash([]);}
+  TRK.forEach((x,k)=>{const a=MPT(x,MZ0),b=MPT(x,MZ1),mine=(k===uk);g.strokeStyle=mine?'#43e06b':'#8a93a3';g.lineWidth=mine?3:1.5;g.beginPath();g.moveTo(a[0],a[1]);g.lineTo(b[0],b[1]);g.stroke();
+    g.fillStyle=mine?'#9dffb4':'#cfe3ff';g.font='bold 9px sans-serif';g.textAlign='right';g.fillText('पटरी '+(k+1)+(routeSelectable()&&k===recK?' ★':''),W-3,a[1]-3);});
+  SIG.forEach(s=>[s.home,s.start].forEach(o=>{const p=MPT(o.x,o.z);g.fillStyle=o.red?'#ff3b3b':'#33ff77';g.beginPath();g.arc(p[0],p[1],2.6,0,7);g.fill();}));
+  {const a=MPT(TRK[uk]-2.5,92),b=MPT(TRK[uk]+2.5,92);g.strokeStyle='#ffe14a';g.lineWidth=2;g.beginPath();g.moveTo(a[0],a[1]);g.lineTo(b[0],b[1]);g.stroke();}
+  trains.forEach(t=>{if(t.state==='gone')return;const z0=t.dir>0?t.front-t.len:t.front,z1=t.dir>0?t.front:t.front+t.len,a=MPT(t.x-1.4,z0),b=MPT(t.x+1.4,z1);
+    g.fillStyle=t.isUser?'#ffd23f':'#b8c0cc';g.fillRect(a[0],a[1]-1,Math.max(3,b[0]-a[0]),b[1]-a[1]+2);const h=MPT(t.x,t.front);g.fillStyle=t.isUser?'#ff7a00':'#606a78';g.beginPath();g.arc(h[0],h[1],3,0,7);g.fill();});
+  if(mode==='walk'){const p=MPT(P.x,P.z);g.fillStyle='#ff4040';g.strokeStyle='#fff';g.lineWidth=1.5;g.beginPath();g.arc(p[0],p[1],3.4,0,7);g.fill();g.stroke();}
+  g.fillStyle='#fff';g.font='bold 10px sans-serif';g.textAlign='left';g.fillText('🚉 '+MP[stIdx][0],6,11);}
+
+/* ================= मुख्य लूप ================= */
+let last=performance.now(),clockT=0,wasRiding=null,avatarWalk=0;
+function updateWalk(dt){
+  let ix=jx+(key.KeyD||key.ArrowRight?1:0)-(key.KeyA||key.ArrowLeft?1:0),iy=jy+(key.KeyS||key.ArrowDown?1:0)-(key.KeyW||key.ArrowUp?1:0);
+  const m=Math.min(1,Math.hypot(ix,iy));avMoving=m>.05;
+  if(m>.05){const sp=(m>.92||key.ShiftLeft)?5.6:2.9,fx=-Math.sin(P.yaw),fz=-Math.cos(P.yaw),rx=-fz,rz=fx,L=Math.hypot(ix,iy);
+    const vx=(fx*(-iy)+rx*ix)/L*sp*m,vz=(fz*(-iy)+rz*ix)/L*sp*m;
+    movePlayer(vx*dt,vz*dt);avatar.rotation.y=Math.atan2(vx,vz);avatarWalk+=dt*(m>.92?10:7);}
+  if(P.riding)P.z+=P.riding.dz;
+  const gy=surfaceY(P.x,P.z,P.feet);
+  if(P.feet<=gy+.001&&P.vy<=0){P.feet=gy;P.vy=0;P.grounded=true;}
+  else{P.vy-=18*dt;P.feet+=P.vy*dt;P.grounded=false;if(P.feet<=gy&&P.vy<=0){P.feet=gy;P.vy=0;P.grounded=true;}}
+  P.riding=null;if(P.feet>=FLOORY-.3)for(const t of trains){for(const p of t.parts){if(!p.loco&&inRect(t,p,P.x,P.z,-.05))P.riding=t;}}
+  if(!P.riding&&P.feet<PH-.2)for(const t of trains){if(t.speed>1.5&&Math.abs(P.x-t.x)<1.9&&(P.z-t.front)*t.dir<2&&(P.z-t.front+t.dir*t.len)*t.dir>-2){P.x=t.x-2.8;P.feet=PH;toast('⚠ चलती ट्रेन के पास न जाएँ!');}}
+}
+function updateCamera(dt){
+  if(mode==='enter'){camAnim.t+=dt/1.6;const s=Math.min(1,camAnim.t),e=s*s*(3-2*s),tp=cabPose();
+    camera.position.lerpVectors(camAnim.p,tp.pos,e);camera.quaternion.copy(camAnim.q).slerp(tp.q,e);if(s>.55)avatar.visible=false;
+    if(s>=1){mode='drive';camAnim=null;$('drive').style.display='flex';toast('🚂 आप ड्राइवर सीट पर हैं।  ▲ से गति बढ़ाएँ, BRK से रोकें, 🅰 से ऑटो-स्टॉप',4200);}
+    return;}
+  if(mode==='drive'){const tp=cabPose();camera.position.copy(tp.pos);camera.quaternion.copy(tp.q);return;}
+  const eye=P.feet+1.6;
+  if(camMode==='fp'){camera.position.set(P.x,eye,P.z);camera.rotation.order='YXZ';camera.rotation.y=P.yaw;camera.rotation.x=-P.pitch*0.6+.1;avatar.visible=false;return;}
+  avatar.visible=true;
+  const d=4.6,cp=Math.cos(P.pitch),tx=P.x,ty=P.feet+1.5,tz=P.z;
+  let cx=tx+Math.sin(P.yaw)*d*cp,cz=tz+Math.cos(P.yaw)*d*cp,cy=ty+Math.sin(P.pitch)*d;
+  cy=Math.max(cy,surfaceY(cx,cz,P.feet+1)+.4);camera.position.set(cx,cy,cz);camera.lookAt(tx,ty,tz);}
+function hud(dt){
+  clockT+=dt;const d=new Date();
+  $('sub').textContent='🕘 '+d.toLocaleTimeString('hi-IN',{hour:'2-digit',minute:'2-digit'})+'   ⭐ '+score+'   🎫 '+(ticketsSold+ticketsBought)+(phase==='journey'?'   ➜ '+MP[nextIdx][0]+' '+Math.max(0,remainKm).toFixed(0)+' km':'');
+  const c=computeContext(),pr=$('prompt'),walk=mode==='walk';
+  if(c){pr.style.display='block';pr.textContent=c.t;$('btnUse').textContent=c.use;}else{pr.style.display='none';$('btnUse').textContent='उपयोग';}
+  $('joy').style.display=walk?'block':'none';$('btnJump').style.display=walk?'flex':'none';$('btnUse').style.display=walk?'flex':'none';$('btnLoco').style.display=walk?'flex':'none';
+  const rs=routeSelectable();$('route').style.display=rs?'flex':'none';$('rt1').classList.toggle('sel',uk===0);$('rt3').classList.toggle('sel',uk===2);
+  if(mode==='drive'){const t=userTrain,sg=SIG[uk];$('spd').firstChild.nodeValue=Math.round(t.speed*3.6);$('thrfill').style.height=(thr*100)+'%';
+    let s;if(phase==='station'){
+      if(t.front<-125)s='पटरी '+(uk+1)+' • घर सिग्नल: '+(sg.home.red?'लाल 🔴 रुकें':'हरा 🟢');
+      else if(t.front<100&&t.state!=='dwell')s='पटरी '+(uk+1)+'<br>हरे निशान तक: '+Math.max(0,Math.round(92-t.front))+' m';
+      else if(t.state==='dwell'){s=boardingActive(t)?'🚶 यात्री चढ़ रहे हैं…':(userDwell>12?'स्टार्टर: '+(sg.start.red?'लाल 🔴':'हरा 🟢 — चल सकते हैं'):'यात्री चढ़ रहे हैं…');}
+      else s='स्टार्टर: '+(sg.start.red?'लाल 🔴':'हरा 🟢');
+    }else s='अगला: '+MP[nextIdx][0]+'<br>'+Math.max(0,remainKm).toFixed(0)+' km बाकी';
+    $('dinfo').innerHTML=s;}
+  mapT-=dt;if(mapT<=0&&mapOn){mapT=.12;drawMap();}
+  dashT-=dt;if(dashT<=0&&userTrain&&(mode==='drive'||mode==='enter')){dashT=.1;const t=userTrain,sg=SIG[uk];
+    drawDash(t.parts[0].obj.userData.dash,t.speed,thr,phase==='journey'?Math.max(0,remainKm).toFixed(0)+' km':'पटरी '+(uk+1),phase==='station'&&((t.front<-125&&sg.home.red)||(t.front>60&&sg.start.red)));}
+}
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt=Math.min(.05,(now-last)/1000);last=now;
+  if(started){
+    lifts.forEach(L=>{const dy=L.target-L.y;if(Math.abs(dy)>.001){L.y+=Math.sign(dy)*Math.min(Math.abs(dy),2.2*dt);L.cab.position.y=L.y;}});
+    for(let i=trains.length-1;i>=0;i--){const t=trains[i];t.anim(dt);if(t.isUser)continue;t.update(dt);
+      if(t.state==='gone'){if(P.riding===t){P.riding=null;P.x=PLAT[1].cx;P.z=0;P.feet=PH;toast('ट्रेन रवाना हो चुकी — आप प्लेटफॉर्म 2 पर लौटे');}
+        releaseTrain(t);t.dispose();trains.splice(i,1);spawnT[t.k]=rnd(10,22);setDisplay(t.k,'—','कोई ट्रेन नहीं');}}
+    if(userTrain)userUpdate(dt);
+    if(phase==='station'){
+      for(let k=0;k<3;k++){if(k===uk)continue;if(spawnT[k]<900){spawnT[k]-=dt;if(spawnT[k]<=0&&!trains.some(t=>t.k===k)){spawnAI(k,false);spawnT[k]=999;}}}
+      if(Math.random()<dt*.5)spawnEntrant();
+      if(Math.random()<dt*.15&&activePax()<92)spawnWaiting(Math.floor(Math.random()*3));
+      updateQueues(dt);paxList.forEach(p=>p.update(dt));
+    }else paxList.forEach(p=>{if(p.active)p.update(dt);});
+    if(mode==='walk')updateWalk(dt);else{P.x=userTrain.x;P.z=userTrain.front;avMoving=false;}
+    avatar.position.set(P.x,P.feet,P.z);avPerson.animate(avatarWalk,avMoving?1:0);
+    updateCamera(dt);
+    sun.position.set(camera.position.x+30,camera.position.y+50,camera.position.z+18);sun.target.position.set(camera.position.x,0,camera.position.z);
+    sky.position.copy(camera.position);
+    hud(dt);
+  }else{camera.position.set(8,9,40);camera.lookAt(0,2,-30);}
+  renderer.render(scene,camera);
+}
+/* शुरुआत */
+redrawNames();setNight(false);
+for(let k=0;k<3;k++)setDisplay(k,'—','कोई ट्रेन नहीं');
+startStation(true);
+$('startBtn').addEventListener('click',()=>{started=true;$('start').style.display='none';initAudio();
+  const d=document.documentElement;if(d.requestFullscreen)d.requestFullscreen().then(()=>{try{screen.orientation.lock('landscape');}catch(e){}}).catch(()=>{});
+  setTimeout(()=>{toast('🚉 '+MP[stIdx][0]+' में स्वागत है! इंजन का दरवाज़ा सामने है — "उपयोग" दबाएँ',4200);chime();speak('भारत रेल में आपका स्वागत है।');},300);});
+requestAnimationFrame(frame);
+
+</script>
+<script>if("serviceWorker" in navigator){addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script>
+</body></html>
