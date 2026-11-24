@@ -1,4 +1,4 @@
-const V='bharat-rail-v1';
+const V='bharat-rail-v33';
 const SHELL=['./','index.html','manifest.json','icon-192.png','icon-512.png'];
 const CDN=['https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js','https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js'];
 self.addEventListener('install',e=>{
@@ -15,6 +15,8 @@ self.addEventListener('activate',e=>{
 self.addEventListener('fetch',e=>{
   if(e.request.method!=='GET')return;
   e.respondWith((async()=>{
+    const isDoc=e.request.mode==='navigate'||/\.html$|\/$/.test(new URL(e.request.url).pathname);
+    if(isDoc){try{const r=await fetch(e.request,{cache:'no-store'});if(r&&r.ok){const c=r.clone();caches.open(V).then(ch=>ch.put(e.request,c));return r;}}catch(err){}}
     const m=await caches.match(e.request,{ignoreSearch:true});
     if(m)return m;
     try{
